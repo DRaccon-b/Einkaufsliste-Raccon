@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Einkaufsliste</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main>
+      <h1>🦝 Einkaufsliste</h1>
+
+      <div class="card" id="share-card" hidden>
+        <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
+        <div class="share-row">
+          <input id="share-link" type="text" readonly />
+          <button id="copy-link" class="secondary">Kopieren</button>
+        </div>
+      </div>
+
+      <form class="add-item" id="add-item-form" hidden>
+        <input id="item-text" type="text" placeholder="z.B. Milch" autocomplete="off" required />
+        <button type="submit">+</button>
+      </form>
+
+      <ul id="items"></ul>
+      <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
+      <div class="empty" id="loading-state">Lade…</div>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
