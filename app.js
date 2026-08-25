@@ -27,6 +27,7 @@
   const LAST_CATEGORY_KEY = "einkaufsliste:lastCategory";
   let collapsedKey = null;
   let allItems = [];
+  let sortableInstances = [];
 
   function getListIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -77,6 +78,9 @@
     const filtered = query
       ? allItems.filter((item) => item.text.toLowerCase().includes(query))
       : allItems;
+
+    for (const instance of sortableInstances) instance.destroy();
+    sortableInstances = [];
 
     categoriesEl.innerHTML = "";
     emptyState.hidden = filtered.length > 0;
@@ -135,6 +139,10 @@
           .join(" ");
         li.dataset.id = item.id;
 
+        const dragHandle = document.createElement("span");
+        dragHandle.className = "drag-handle";
+        dragHandle.textContent = "⠿";
+
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = item.checked;
@@ -154,13 +162,31 @@
         deleteBtn.textContent = "✕";
         deleteBtn.addEventListener("click", () => deleteItem(item.id));
 
-        li.append(checkbox, span, starBtn, deleteBtn);
+        li.append(dragHandle, checkbox, span, starBtn, deleteBtn);
         ul.appendChild(li);
       }
 
       details.appendChild(ul);
       categoriesEl.appendChild(details);
+
+      if (!query && window.Sortable) {
+        const instance = window.Sortable.create(ul, {
+          handle: ".drag-handle",
+          animation: 150,
+          onEnd: () => persistOrder(category, [...ul.children].map((li) => li.dataset.id)),
+        });
+        sortableInstances.push(instance);
+      }
     }
+  }
+
+  async function persistOrder(category, orderedIds) {
+    const updates = orderedIds.map((id, index) =>
+      supabase.from("shopping_items").update({ position: index }).eq("id", id)
+    );
+    const results = await Promise.all(updates);
+    const failed = results.find((r) => r.error);
+    if (failed) alert("Konnte Reihenfolge nicht speichern: " + failed.error.message);
   }
 
   async function loadItems(listId) {
