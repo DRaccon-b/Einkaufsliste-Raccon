@@ -85,6 +85,10 @@ form.add-item input {
   font-size: 1rem;
 }
 
+form.add-item input#item-category {
+  flex: 0.6;
+}
+
 ul#items {
   list-style: none;
   margin: 0;
@@ -124,6 +128,19 @@ ul#items li .delete-btn {
   color: var(--muted);
   padding: 4px 8px;
   font-size: 1.1rem;
+}
+
+ul#items li.category-heading {
+  background: transparent;
+  border: none;
+  padding: 12px 2px 2px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--accent);
+}
+
+ul#items li.category-heading:first-child {
+  padding-top: 2px;
 }
 
 .empty {
