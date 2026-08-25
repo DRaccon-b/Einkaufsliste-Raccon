@@ -170,6 +170,7 @@
       .eq("list_id", listId)
       .order("category_order", { ascending: true, nullsFirst: false })
       .order("category", { ascending: true })
+      .order("position", { ascending: true })
       .order("text", { ascending: true });
 
     if (error) {
@@ -184,7 +185,7 @@
   async function addItem(listId, text, category) {
     const { error } = await supabase
       .from("shopping_items")
-      .insert({ list_id: listId, text, category: category || "Sonstiges" });
+      .insert({ list_id: listId, text, category: category || "Sonstiges", position: Date.now() });
     if (error) alert("Konnte Artikel nicht hinzufügen: " + error.message);
   }
 
