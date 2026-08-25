@@ -146,7 +146,11 @@
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = item.checked;
-        checkbox.addEventListener("change", () => toggleItem(item.id, checkbox.checked));
+        checkbox.addEventListener("change", () => {
+          item.checked = checkbox.checked;
+          render();
+          toggleItem(item.id, checkbox.checked);
+        });
 
         const span = document.createElement("span");
         span.className = "item-text";
@@ -156,12 +160,20 @@
         starBtn.className = "star-btn" + (item.important ? " active" : "");
         starBtn.textContent = "★";
         starBtn.title = "Als wichtig markieren";
-        starBtn.addEventListener("click", () => toggleImportant(item.id, !item.important));
+        starBtn.addEventListener("click", () => {
+          item.important = !item.important;
+          render();
+          toggleImportant(item.id, item.important);
+        });
 
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn";
         deleteBtn.textContent = "✕";
-        deleteBtn.addEventListener("click", () => deleteItem(item.id));
+        deleteBtn.addEventListener("click", () => {
+          allItems = allItems.filter((i) => i.id !== item.id);
+          render();
+          deleteItem(item.id);
+        });
 
         li.append(dragHandle, checkbox, span, starBtn, deleteBtn);
         ul.appendChild(li);
@@ -293,10 +305,16 @@
 
     bulkActions.hidden = false;
     checkAllBtn.addEventListener("click", () => {
-      if (confirm("Wirklich alle Artikel abhaken?")) setAllChecked(listId, true);
+      if (!confirm("Wirklich alle Artikel abhaken?")) return;
+      for (const item of allItems) item.checked = true;
+      render();
+      setAllChecked(listId, true);
     });
     uncheckAllBtn.addEventListener("click", () => {
-      if (confirm("Wirklich alle Artikel zurücksetzen?")) setAllChecked(listId, false);
+      if (!confirm("Wirklich alle Artikel zurücksetzen?")) return;
+      for (const item of allItems) item.checked = false;
+      render();
+      setAllChecked(listId, false);
     });
 
     await loadItems(listId);
