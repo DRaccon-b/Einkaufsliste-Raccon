@@ -16,10 +16,14 @@
   const addItemForm = document.getElementById("add-item-form");
   const itemTextInput = document.getElementById("item-text");
   const itemCategoryInput = document.getElementById("item-category");
-  const itemsEl = document.getElementById("items");
+  const searchRow = document.getElementById("search-row");
+  const searchInput = document.getElementById("search-input");
+  const categoriesEl = document.getElementById("categories");
   const emptyState = document.getElementById("empty-state");
 
   const LAST_CATEGORY_KEY = "einkaufsliste:lastCategory";
+  let collapsedKey = null;
+  let allItems = [];
 
   function getListIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -45,12 +49,37 @@
     window.history.replaceState({}, "", url);
   }
 
+  function getCollapsedSet() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(collapsedKey) || "[]"));
+    } catch {
+      return new Set();
+    }
+  }
+
+  function setCollapsed(category, collapsed) {
+    const set = getCollapsedSet();
+    if (collapsed) set.add(category);
+    else set.delete(category);
+    localStorage.setItem(collapsedKey, JSON.stringify([...set]));
+  }
+
   function renderItems(items) {
-    itemsEl.innerHTML = "";
-    emptyState.hidden = items.length > 0;
+    allItems = items;
+    render();
+  }
+
+  function render() {
+    const query = searchInput.value.trim().toLowerCase();
+    const filtered = query
+      ? allItems.filter((item) => item.text.toLowerCase().includes(query))
+      : allItems;
+
+    categoriesEl.innerHTML = "";
+    emptyState.hidden = filtered.length > 0;
 
     const categories = new Map();
-    for (const item of items) {
+    for (const item of filtered) {
       const category = item.category || "Sonstiges";
       if (!categories.has(category)) categories.set(category, []);
       categories.get(category).push(item);
@@ -58,21 +87,36 @@
 
     const categoryList = document.getElementById("category-list");
     categoryList.innerHTML = "";
-    for (const category of categories.keys()) {
+    for (const category of new Set(allItems.map((i) => i.category || "Sonstiges"))) {
       const option = document.createElement("option");
       option.value = category;
       categoryList.appendChild(option);
     }
 
+    const collapsedSet = getCollapsedSet();
+
     for (const [category, categoryItems] of categories) {
-      const heading = document.createElement("li");
-      heading.className = "category-heading";
-      heading.textContent = category;
-      itemsEl.appendChild(heading);
+      const details = document.createElement("details");
+      details.className = "category";
+      details.open = query ? true : !collapsedSet.has(category);
+
+      const summary = document.createElement("summary");
+      const doneCount = categoryItems.filter((i) => i.checked).length;
+      summary.innerHTML = `<span class="chevron">▸</span> ${category} <span class="count">${doneCount}/${categoryItems.length}</span>`;
+      details.appendChild(summary);
+
+      details.addEventListener("toggle", () => {
+        setCollapsed(category, !details.open);
+      });
+
+      const ul = document.createElement("ul");
+      ul.className = "items";
 
       for (const item of categoryItems) {
         const li = document.createElement("li");
-        li.className = item.checked ? "checked" : "";
+        li.className = [item.checked ? "checked" : "", item.important ? "important" : ""]
+          .filter(Boolean)
+          .join(" ");
         li.dataset.id = item.id;
 
         const checkbox = document.createElement("input");
@@ -83,14 +127,23 @@
         const span = document.createElement("span");
         span.textContent = item.text;
 
+        const starBtn = document.createElement("button");
+        starBtn.className = "star-btn" + (item.important ? " active" : "");
+        starBtn.textContent = "★";
+        starBtn.title = "Als wichtig markieren";
+        starBtn.addEventListener("click", () => toggleImportant(item.id, !item.important));
+
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn";
         deleteBtn.textContent = "✕";
         deleteBtn.addEventListener("click", () => deleteItem(item.id));
 
-        li.append(checkbox, span, deleteBtn);
-        itemsEl.appendChild(li);
+        li.append(checkbox, span, starBtn, deleteBtn);
+        ul.appendChild(li);
       }
+
+      details.appendChild(ul);
+      categoriesEl.appendChild(details);
     }
   }
 
@@ -127,6 +180,14 @@
     if (error) alert("Konnte Status nicht ändern: " + error.message);
   }
 
+  async function toggleImportant(itemId, important) {
+    const { error } = await supabase
+      .from("shopping_items")
+      .update({ important })
+      .eq("id", itemId);
+    if (error) alert("Konnte Markierung nicht ändern: " + error.message);
+  }
+
   async function deleteItem(itemId) {
     const { error } = await supabase.from("shopping_items").delete().eq("id", itemId);
     if (error) alert("Konnte Artikel nicht löschen: " + error.message);
@@ -151,9 +212,12 @@
       setListIdInUrl(listId);
     }
 
+    collapsedKey = `einkaufsliste:collapsed:${listId}`;
+
     shareLinkInput.value = window.location.href;
     shareCard.hidden = false;
     addItemForm.hidden = false;
+    searchRow.hidden = false;
 
     copyLinkBtn.addEventListener("click", async () => {
       await navigator.clipboard.writeText(shareLinkInput.value);
@@ -172,6 +236,8 @@
       if (category) localStorage.setItem(LAST_CATEGORY_KEY, category);
       await addItem(listId, text, category);
     });
+
+    searchInput.addEventListener("input", () => render());
 
     await loadItems(listId);
     subscribeToChanges(listId);

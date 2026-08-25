@@ -25,7 +25,11 @@
         <button type="submit">+</button>
       </form>
 
-      <ul id="items"></ul>
+      <div class="search-row" id="search-row" hidden>
+        <input id="search-input" type="search" placeholder="Suchen…" autocomplete="off" />
+      </div>
+
+      <div id="categories"></div>
       <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
       <div class="empty" id="loading-state">Lade…</div>
     </main>

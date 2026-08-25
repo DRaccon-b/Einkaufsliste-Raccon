@@ -17,6 +17,7 @@ create table if not exists shopping_items (
 );
 
 alter table shopping_items add column if not exists category text not null default 'Sonstiges';
+alter table shopping_items add column if not exists important boolean not null default false;
 
 alter table shopping_lists enable row level security;
 alter table shopping_items enable row level security;
