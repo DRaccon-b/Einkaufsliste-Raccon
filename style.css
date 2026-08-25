@@ -80,6 +80,7 @@ h1 {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
+  margin-top: 20px;
   margin-bottom: 16px;
 }
 

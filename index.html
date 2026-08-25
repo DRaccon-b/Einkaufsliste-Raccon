@@ -16,14 +16,6 @@
         <div class="version-tag">v1.2.0</div>
       </div>
 
-      <div class="card" id="share-card" hidden>
-        <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
-        <div class="share-row">
-          <input id="share-link" type="text" readonly />
-          <button id="copy-link" class="secondary">Kopieren</button>
-        </div>
-      </div>
-
       <form class="add-item" id="add-item-form" hidden>
         <input id="item-text" type="text" placeholder="z.B. Milch" autocomplete="off" required />
         <input id="item-category" type="text" placeholder="Kategorie" autocomplete="off" list="category-list" />
@@ -38,6 +30,14 @@
       <div id="categories"></div>
       <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
       <div class="empty" id="loading-state">Lade…</div>
+
+      <div class="card" id="share-card" hidden>
+        <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
+        <div class="share-row">
+          <input id="share-link" type="text" readonly />
+          <button id="copy-link" class="secondary">Kopieren</button>
+        </div>
+      </div>
     </main>
 
     <script src="config.js"></script>
