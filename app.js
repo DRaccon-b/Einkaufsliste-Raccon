@@ -168,7 +168,9 @@
       .from("shopping_items")
       .select("*")
       .eq("list_id", listId)
-      .order("seq", { ascending: true });
+      .order("category_order", { ascending: true, nullsFirst: false })
+      .order("category", { ascending: true })
+      .order("text", { ascending: true });
 
     if (error) {
       loadingState.textContent = "Fehler beim Laden: " + error.message;
