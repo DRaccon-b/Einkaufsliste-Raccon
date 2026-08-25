@@ -235,16 +235,18 @@ ul.items {
 ul.items li {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
-ul.items li span {
+ul.items li .item-text {
   flex: 1;
   word-break: break-word;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 ul.items li.checked {
@@ -252,7 +254,7 @@ ul.items li.checked {
   border-color: transparent;
 }
 
-ul.items li.checked span {
+ul.items li.checked .item-text {
   text-decoration: line-through;
   color: var(--muted);
 }
@@ -268,10 +270,10 @@ ul.items li.important.checked {
 }
 
 ul.items li .drag-handle {
-  color: var(--border);
-  font-size: 1.1rem;
-  padding: 6px 2px;
-  min-width: 24px;
+  color: var(--muted);
+  font-size: 1rem;
+  padding: 0;
+  width: 20px;
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -290,19 +292,44 @@ ul.items li.sortable-chosen {
 }
 
 ul.items li input[type="checkbox"] {
-  width: 24px;
-  height: 24px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
   flex-shrink: 0;
   touch-action: manipulation;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  position: relative;
+  margin: 0;
+  cursor: pointer;
+}
+
+ul.items li input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+ul.items li input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 ul.items li .star-btn {
   background: transparent;
   color: var(--border);
-  padding: 6px;
-  min-width: 40px;
-  min-height: 40px;
-  font-size: 1.2rem;
+  padding: 0;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 1.1rem;
   line-height: 1;
   flex-shrink: 0;
   touch-action: manipulation;
@@ -315,10 +342,10 @@ ul.items li .star-btn.active {
 ul.items li .delete-btn {
   background: transparent;
   color: var(--muted);
-  padding: 6px;
-  min-width: 40px;
-  min-height: 40px;
-  font-size: 1.1rem;
+  padding: 0;
+  min-width: 32px;
+  min-height: 36px;
+  font-size: 1rem;
   flex-shrink: 0;
   touch-action: manipulation;
 }

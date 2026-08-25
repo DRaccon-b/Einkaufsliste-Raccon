@@ -149,6 +149,7 @@
         checkbox.addEventListener("change", () => toggleItem(item.id, checkbox.checked));
 
         const span = document.createElement("span");
+        span.className = "item-text";
         span.textContent = item.text;
 
         const starBtn = document.createElement("button");
