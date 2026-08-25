@@ -102,7 +102,20 @@
 
       const summary = document.createElement("summary");
       const doneCount = categoryItems.filter((i) => i.checked).length;
-      summary.innerHTML = `<span class="chevron">▸</span> ${category} <span class="count">${doneCount}/${categoryItems.length}</span>`;
+
+      const chevron = document.createElement("span");
+      chevron.className = "chevron";
+      chevron.textContent = "▸";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "category-name";
+      nameSpan.textContent = category;
+
+      const countSpan = document.createElement("span");
+      countSpan.className = "count";
+      countSpan.textContent = `${doneCount}/${categoryItems.length}`;
+
+      summary.append(chevron, nameSpan, countSpan);
       details.appendChild(summary);
 
       details.addEventListener("toggle", () => {
