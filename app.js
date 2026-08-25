@@ -170,7 +170,8 @@
       .eq("list_id", listId)
       .order("category", { ascending: true })
       .order("position", { ascending: true })
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true });
 
     if (error) {
       loadingState.textContent = "Fehler beim Laden: " + error.message;
