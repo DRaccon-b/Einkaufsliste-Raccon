@@ -20,6 +20,9 @@
   const searchInput = document.getElementById("search-input");
   const categoriesEl = document.getElementById("categories");
   const emptyState = document.getElementById("empty-state");
+  const bulkActions = document.getElementById("bulk-actions");
+  const checkAllBtn = document.getElementById("check-all-btn");
+  const uncheckAllBtn = document.getElementById("uncheck-all-btn");
 
   const LAST_CATEGORY_KEY = "einkaufsliste:lastCategory";
   let collapsedKey = null;
@@ -206,6 +209,14 @@
     if (error) alert("Konnte Artikel nicht löschen: " + error.message);
   }
 
+  async function setAllChecked(listId, checked) {
+    const { error } = await supabase
+      .from("shopping_items")
+      .update({ checked })
+      .eq("list_id", listId);
+    if (error) alert("Konnte Liste nicht aktualisieren: " + error.message);
+  }
+
   function subscribeToChanges(listId) {
     supabase
       .channel(`shopping_items:${listId}`)
@@ -251,6 +262,14 @@
     });
 
     searchInput.addEventListener("input", () => render());
+
+    bulkActions.hidden = false;
+    checkAllBtn.addEventListener("click", () => {
+      if (confirm("Wirklich alle Artikel abhaken?")) setAllChecked(listId, true);
+    });
+    uncheckAllBtn.addEventListener("click", () => {
+      if (confirm("Wirklich alle Artikel zurücksetzen?")) setAllChecked(listId, false);
+    });
 
     await loadItems(listId);
     subscribeToChanges(listId);

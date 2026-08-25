@@ -301,6 +301,16 @@ ul.items li .delete-btn {
   touch-action: manipulation;
 }
 
+.bulk-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.bulk-actions button {
+  flex: 1;
+}
+
 .empty {
   color: var(--muted);
   text-align: center;

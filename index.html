@@ -13,7 +13,7 @@
     <main>
       <div class="title-row">
         <h1>🦝🐭 Einkaufsliste</h1>
-        <div class="version-tag">v1.2.0</div>
+        <div class="version-tag">v1.3.0</div>
       </div>
 
       <form class="add-item" id="add-item-form" hidden>
@@ -30,6 +30,11 @@
       <div id="categories"></div>
       <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
       <div class="empty" id="loading-state">Lade…</div>
+
+      <div class="bulk-actions" id="bulk-actions" hidden>
+        <button id="check-all-btn" class="secondary">Alles abhaken</button>
+        <button id="uncheck-all-btn" class="secondary">Alles zurücksetzen</button>
+      </div>
 
       <div class="card" id="share-card" hidden>
         <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
