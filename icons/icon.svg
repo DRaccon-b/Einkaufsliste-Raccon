@@ -1,0 +1,36 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ad754a"/>
+      <stop offset="1" stop-color="#6b4326"/>
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" rx="44" fill="url(#bg)"/>
+
+  <!-- ears -->
+  <path d="M32 88 Q30 34 82 62 Q68 92 32 88 Z" fill="#4a2f1c"/>
+  <path d="M168 88 Q170 34 118 62 Q132 92 168 88 Z" fill="#4a2f1c"/>
+  <path d="M44 80 Q45 48 76 63 Q66 82 44 80 Z" fill="#a9754a"/>
+  <path d="M156 80 Q155 48 124 63 Q134 82 156 80 Z" fill="#a9754a"/>
+
+  <!-- head -->
+  <ellipse cx="100" cy="122" rx="64" ry="56" fill="#ecdfc7"/>
+
+  <!-- cheeks -->
+  <ellipse cx="66" cy="132" rx="21" ry="26" fill="#faf5ea"/>
+  <ellipse cx="134" cy="132" rx="21" ry="26" fill="#faf5ea"/>
+
+  <!-- mask -->
+  <path d="M40 102 Q100 76 160 102 Q154 134 100 137 Q46 134 40 102 Z" fill="#3a281a"/>
+
+  <!-- eyes -->
+  <circle cx="78" cy="110" r="8" fill="#fdfaf3"/>
+  <circle cx="122" cy="110" r="8" fill="#fdfaf3"/>
+  <circle cx="79.5" cy="111.5" r="4.4" fill="#241812"/>
+  <circle cx="123.5" cy="111.5" r="4.4" fill="#241812"/>
+  <circle cx="81" cy="109" r="1.4" fill="#fff"/>
+  <circle cx="125" cy="109" r="1.4" fill="#fff"/>
+
+  <!-- nose -->
+  <path d="M100 134 l-11 9 q11 10 22 0 Z" fill="#241812"/>
+</svg>
