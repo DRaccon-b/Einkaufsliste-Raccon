@@ -101,6 +101,139 @@
       render();
     }
 
+    function buildItemRow(item, isMirrorCategory) {
+      const li = document.createElement("li");
+      li.dataset.id = item.id;
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.className = "item-checkbox";
+
+      const span = document.createElement("span");
+      span.className = "item-text";
+      span.contentEditable = "true";
+      span.spellcheck = false;
+
+      const quantityInput = document.createElement("input");
+      quantityInput.type = "text";
+      quantityInput.inputMode = "decimal";
+      quantityInput.className = "quantity-input";
+
+      const unitSelect = document.createElement("select");
+      unitSelect.className = "unit-select";
+      const unitOptions = ["", "Stk", "g", "kg", "ml", "L", "Bund", "Netz", "Paket", "Dose"];
+      for (const u of unitOptions) {
+        const option = document.createElement("option");
+        option.value = u;
+        option.textContent = u;
+        unitSelect.appendChild(option);
+      }
+
+      const starBtn = document.createElement("button");
+      starBtn.className = "star-btn";
+      starBtn.textContent = "★";
+      starBtn.title = "Als wichtig markieren";
+
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-btn";
+      deleteBtn.textContent = "✕";
+
+      li.append(checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
+
+      checkbox.addEventListener("change", () => {
+        const current = li._item;
+        current.checked = checkbox.checked;
+        if (li._isMirror && checkbox.checked) {
+          mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
+          li.remove();
+        } else {
+          li.classList.toggle("checked", current.checked);
+        }
+        toggleItem(current.id, checkbox.checked);
+      });
+
+      span.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          span.blur();
+        }
+      });
+      span.addEventListener("blur", () => {
+        const current = li._item;
+        const newText = span.textContent.trim();
+        if (!newText) {
+          span.textContent = current.text;
+          return;
+        }
+        if (newText === current.text) return;
+        current.text = newText;
+        updateItemFields(current.id, { text: newText });
+      });
+
+      quantityInput.addEventListener("change", () => {
+        const current = li._item;
+        current.quantity = quantityInput.value.trim() || null;
+        updateItemFields(current.id, { quantity: current.quantity });
+      });
+
+      unitSelect.addEventListener("change", () => {
+        const current = li._item;
+        current.unit = unitSelect.value || null;
+        updateItemFields(current.id, { unit: current.unit });
+      });
+
+      starBtn.addEventListener("click", () => {
+        const current = li._item;
+        current.important = !current.important;
+        li.classList.toggle("important", current.important);
+        starBtn.classList.toggle("active", current.important);
+        toggleImportant(current.id, current.important);
+      });
+
+      deleteBtn.addEventListener("click", () => {
+        const current = li._item;
+        if (li._isMirror) {
+          mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
+        } else {
+          allItems = allItems.filter((i) => i.id !== current.id);
+        }
+        li.remove();
+        deleteItem(current.id);
+      });
+
+      updateItemRow(li, item, isMirrorCategory);
+      return li;
+    }
+
+    function updateItemRow(li, item, isMirrorCategory) {
+      li._item = item;
+      li._isMirror = isMirrorCategory;
+      li.className = [item.checked ? "checked" : "", item.important ? "important" : ""]
+        .filter(Boolean)
+        .join(" ");
+
+      const checkbox = li.querySelector(".item-checkbox");
+      if (checkbox.checked !== item.checked) checkbox.checked = item.checked;
+
+      const span = li.querySelector(".item-text");
+      if (document.activeElement !== span && span.textContent !== item.text) {
+        span.textContent = item.text;
+      }
+
+      const quantityInput = li.querySelector(".quantity-input");
+      if (document.activeElement !== quantityInput) {
+        quantityInput.value = item.quantity || "";
+      }
+
+      const unitSelect = li.querySelector(".unit-select");
+      if (document.activeElement !== unitSelect) {
+        unitSelect.value = item.unit || "";
+      }
+
+      const starBtn = li.querySelector(".star-btn");
+      starBtn.classList.toggle("active", !!item.important);
+    }
+
     function render() {
       const query = searchInput.value.trim().toLowerCase();
       let filtered = query ? allItems.filter((item) => item.text.toLowerCase().includes(query)) : allItems;
@@ -109,10 +242,6 @@
         filtered = filtered.filter((item) => !item.checked);
       }
 
-      for (const instance of sortableInstances) instance.destroy();
-      sortableInstances = [];
-
-      categoriesEl.innerHTML = "";
       emptyState.hidden = filtered.length > 0;
 
       const categories = new Map();
@@ -139,138 +268,80 @@
       }
 
       const collapsedSet = getCollapsedSet();
+      const existingDetails = new Map();
+      for (const details of categoriesEl.children) {
+        existingDetails.set(details.dataset.category, details);
+      }
 
+      let prevDetails = null;
       for (const [category, categoryItems] of categories) {
-        const details = document.createElement("details");
-        details.className = "category";
-        details.open = query ? true : !collapsedSet.has(category);
-
-        const summary = document.createElement("summary");
-        const doneCount = categoryItems.filter((i) => i.checked).length;
-
-        const chevron = document.createElement("span");
-        chevron.className = "chevron";
-        chevron.textContent = "▸";
-
-        const nameSpan = document.createElement("span");
-        nameSpan.className = "category-name";
-        nameSpan.textContent = category;
-
-        const countSpan = document.createElement("span");
-        countSpan.className = "count";
-        countSpan.textContent = `${doneCount}/${categoryItems.length}`;
-
-        summary.append(chevron, nameSpan, countSpan);
-        details.appendChild(summary);
-
-        details.addEventListener("toggle", () => {
-          setCollapsed(category, !details.open);
-        });
-
         const isMirrorCategory = mirror && category === mirror.categoryName;
+        let details = existingDetails.get(category);
+        let ul;
 
-        const ul = document.createElement("ul");
-        ul.className = "items";
+        if (!details) {
+          details = document.createElement("details");
+          details.className = "category";
+          details.dataset.category = category;
+          details.open = query ? true : !collapsedSet.has(category);
 
-        for (const item of categoryItems) {
-          const li = document.createElement("li");
-          li.className = [item.checked ? "checked" : "", item.important ? "important" : ""]
-            .filter(Boolean)
-            .join(" ");
-          li.dataset.id = item.id;
+          const summary = document.createElement("summary");
+          const chevron = document.createElement("span");
+          chevron.className = "chevron";
+          chevron.textContent = "▸";
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "category-name";
+          nameSpan.textContent = category;
+          const countSpan = document.createElement("span");
+          countSpan.className = "count";
+          summary.append(chevron, nameSpan, countSpan);
+          details.appendChild(summary);
 
-          const checkbox = document.createElement("input");
-          checkbox.type = "checkbox";
-          checkbox.checked = item.checked;
-          checkbox.addEventListener("change", () => {
-            item.checked = checkbox.checked;
-            if (isMirrorCategory && checkbox.checked) {
-              mirrorItems = mirrorItems.filter((i) => i.id !== item.id);
-              li.remove();
-            } else {
-              li.classList.toggle("checked", item.checked);
-            }
-            toggleItem(item.id, checkbox.checked);
+          details.addEventListener("toggle", () => {
+            setCollapsed(category, !details.open);
           });
 
-          const span = document.createElement("span");
-          span.className = "item-text";
-          span.textContent = item.text;
-          span.contentEditable = "true";
-          span.spellcheck = false;
-          span.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              span.blur();
-            }
-          });
-          span.addEventListener("blur", () => {
-            const newText = span.textContent.trim();
-            if (!newText) {
-              span.textContent = item.text;
-              return;
-            }
-            if (newText === item.text) return;
-            item.text = newText;
-            updateItemFields(item.id, { text: newText });
-          });
-
-          const quantityInput = document.createElement("input");
-          quantityInput.type = "text";
-          quantityInput.inputMode = "decimal";
-          quantityInput.className = "quantity-input";
-          quantityInput.value = item.quantity || "";
-          quantityInput.addEventListener("change", () => {
-            item.quantity = quantityInput.value.trim() || null;
-            updateItemFields(item.id, { quantity: item.quantity });
-          });
-
-          const unitSelect = document.createElement("select");
-          unitSelect.className = "unit-select";
-          const unitOptions = ["", "Stk", "g", "kg", "ml", "L", "Bund", "Netz", "Paket", "Dose"];
-          for (const u of unitOptions) {
-            const option = document.createElement("option");
-            option.value = u;
-            option.textContent = u;
-            unitSelect.appendChild(option);
-          }
-          unitSelect.value = item.unit || "";
-          unitSelect.addEventListener("change", () => {
-            item.unit = unitSelect.value || null;
-            updateItemFields(item.id, { unit: item.unit });
-          });
-
-          const starBtn = document.createElement("button");
-          starBtn.className = "star-btn" + (item.important ? " active" : "");
-          starBtn.textContent = "★";
-          starBtn.title = "Als wichtig markieren";
-          starBtn.addEventListener("click", () => {
-            item.important = !item.important;
-            li.classList.toggle("important", item.important);
-            starBtn.classList.toggle("active", item.important);
-            toggleImportant(item.id, item.important);
-          });
-
-          const deleteBtn = document.createElement("button");
-          deleteBtn.className = "delete-btn";
-          deleteBtn.textContent = "✕";
-          deleteBtn.addEventListener("click", () => {
-            if (isMirrorCategory) {
-              mirrorItems = mirrorItems.filter((i) => i.id !== item.id);
-            } else {
-              allItems = allItems.filter((i) => i.id !== item.id);
-            }
-            li.remove();
-            deleteItem(item.id);
-          });
-
-          li.append(checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
-          ul.appendChild(li);
+          ul = document.createElement("ul");
+          ul.className = "items";
+          details.appendChild(ul);
+        } else {
+          existingDetails.delete(category);
+          if (query) details.open = true;
+          ul = details.querySelector("ul");
         }
 
-        details.appendChild(ul);
-        categoriesEl.appendChild(details);
+        const doneCount = categoryItems.filter((i) => i.checked).length;
+        details.querySelector(".count").textContent = `${doneCount}/${categoryItems.length}`;
 
+        const existingRows = new Map();
+        for (const li of ul.children) existingRows.set(li.dataset.id, li);
+
+        let prevLi = null;
+        for (const item of categoryItems) {
+          let li = existingRows.get(item.id);
+          if (li) {
+            existingRows.delete(item.id);
+            updateItemRow(li, item, isMirrorCategory);
+          } else {
+            li = buildItemRow(item, isMirrorCategory);
+          }
+          const wantedNext = prevLi ? prevLi.nextSibling : ul.firstChild;
+          if (wantedNext !== li) ul.insertBefore(li, wantedNext);
+          prevLi = li;
+        }
+        for (const leftover of existingRows.values()) leftover.remove();
+
+        if (prevDetails) {
+          if (prevDetails.nextSibling !== details) categoriesEl.insertBefore(details, prevDetails.nextSibling);
+        } else if (categoriesEl.firstChild !== details) {
+          categoriesEl.insertBefore(details, categoriesEl.firstChild);
+        }
+        prevDetails = details;
+
+        for (const instance of sortableInstances) {
+          if (instance.el === ul) instance.destroy();
+        }
+        sortableInstances = sortableInstances.filter((i) => i.el !== ul);
         if (!query && !hideCheckedFilter.checked && !isMirrorCategory && window.Sortable) {
           const instance = window.Sortable.create(ul, {
             animation: 150,
@@ -282,6 +353,18 @@
           });
           sortableInstances.push(instance);
         }
+      }
+
+      for (const leftover of existingDetails.values()) {
+        const leftoverUl = leftover.querySelector("ul");
+        sortableInstances = sortableInstances.filter((i) => {
+          if (i.el === leftoverUl) {
+            i.destroy();
+            return false;
+          }
+          return true;
+        });
+        leftover.remove();
       }
     }
 
