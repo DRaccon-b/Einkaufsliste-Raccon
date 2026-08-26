@@ -15,6 +15,13 @@
 
   function debugLog() {}
 
+  // Shared across both list controllers so an optimistic change made via a
+  // mirrored item (owned by the other list) still protects that item's own
+  // controller from a stale/delayed realtime read overwriting it.
+  const localOverrides = new Map();
+  const pendingWrites = new Map();
+  const overrideClearTimers = new Map();
+
   async function createList() {
     const { data, error } = await supabase.from("shopping_lists").insert({}).select().single();
     if (error) {
@@ -396,8 +403,6 @@
       if (failed) alert("Konnte Reihenfolge nicht speichern: " + failed.error.message);
     }
 
-    const localOverrides = new Map();
-
     function applyOverrides(data) {
       for (const item of data) {
         const overrides = localOverrides.get(item.id);
@@ -457,10 +462,6 @@
         .insert({ list_id: listId, text, category: category || "Sonstiges", position: Date.now() });
       if (error) alert("Konnte Artikel nicht hinzufügen: " + error.message);
     }
-
-    const pendingWrites = new Map();
-
-    const overrideClearTimers = new Map();
 
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
