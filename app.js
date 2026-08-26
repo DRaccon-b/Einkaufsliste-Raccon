@@ -423,19 +423,30 @@
       if (error) alert("Konnte Artikel nicht hinzufügen: " + error.message);
     }
 
-    async function toggleItem(itemId, checked) {
-      const { error } = await supabase.from("shopping_items").update({ checked }).eq("id", itemId);
-      if (error) alert("Konnte Status nicht ändern: " + error.message);
+    const pendingWrites = new Map();
+
+    function writeFieldsDebounced(itemId, fields, errorMessage) {
+      const key = itemId + ":" + Object.keys(fields).sort().join(",");
+      const existing = pendingWrites.get(key);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(async () => {
+        pendingWrites.delete(key);
+        const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
+        if (error) alert(errorMessage + error.message);
+      }, 250);
+      pendingWrites.set(key, timer);
     }
 
-    async function toggleImportant(itemId, important) {
-      const { error } = await supabase.from("shopping_items").update({ important }).eq("id", itemId);
-      if (error) alert("Konnte Markierung nicht ändern: " + error.message);
+    function toggleItem(itemId, checked) {
+      writeFieldsDebounced(itemId, { checked }, "Konnte Status nicht ändern: ");
     }
 
-    async function updateItemFields(itemId, fields) {
-      const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
-      if (error) alert("Konnte Angabe nicht speichern: " + error.message);
+    function toggleImportant(itemId, important) {
+      writeFieldsDebounced(itemId, { important }, "Konnte Markierung nicht ändern: ");
+    }
+
+    function updateItemFields(itemId, fields) {
+      writeFieldsDebounced(itemId, fields, "Konnte Angabe nicht speichern: ");
     }
 
     async function deleteItem(itemId) {
