@@ -216,9 +216,11 @@
     function updateItemRow(li, item, isMirrorCategory) {
       li._item = item;
       li._isMirror = isMirrorCategory;
-      li.className = [item.checked ? "checked" : "", item.important ? "important" : ""]
+
+      const wantedClass = [item.checked ? "checked" : "", item.important ? "important" : ""]
         .filter(Boolean)
         .join(" ");
+      if (li.className !== wantedClass) li.className = wantedClass;
 
       const checkbox = li.querySelector(".item-checkbox");
       if (checkbox.checked !== item.checked) checkbox.checked = item.checked;
@@ -229,12 +231,12 @@
       }
 
       const quantityInput = li.querySelector(".quantity-input");
-      if (document.activeElement !== quantityInput) {
+      if (document.activeElement !== quantityInput && quantityInput.value !== (item.quantity || "")) {
         quantityInput.value = item.quantity || "";
       }
 
       const unitSelect = li.querySelector(".unit-select");
-      if (document.activeElement !== unitSelect) {
+      if (document.activeElement !== unitSelect && unitSelect.value !== (item.unit || "")) {
         unitSelect.value = item.unit || "";
       }
 
@@ -321,7 +323,9 @@
         }
 
         const doneCount = categoryItems.filter((i) => i.checked).length;
-        details.querySelector(".count").textContent = `${doneCount}/${categoryItems.length}`;
+        const countText = `${doneCount}/${categoryItems.length}`;
+        const countEl = details.querySelector(".count");
+        if (countEl.textContent !== countText) countEl.textContent = countText;
 
         const existingRows = new Map();
         for (const li of ul.children) existingRows.set(li.dataset.id, li);
