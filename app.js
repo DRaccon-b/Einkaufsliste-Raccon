@@ -77,7 +77,9 @@
     const hideCheckedKey = "einkaufsliste:hideChecked:" + listId;
 
     let allItems = [];
+    let mirrorItems = [];
     let sortableInstances = [];
+    const mirror = options && options.mirror;
 
     function getCollapsedSet() {
       try {
@@ -120,6 +122,15 @@
         categories.get(category).push(item);
       }
 
+      if (mirror) {
+        const mirrorFiltered = query
+          ? mirrorItems.filter((item) => item.text.toLowerCase().includes(query))
+          : mirrorItems;
+        if (mirrorFiltered.length > 0) {
+          categories.set(mirror.categoryName, mirrorFiltered);
+        }
+      }
+
       categoryList.innerHTML = "";
       for (const category of new Set(allItems.map((i) => i.category || "Sonstiges"))) {
         const option = document.createElement("option");
@@ -156,6 +167,8 @@
           setCollapsed(category, !details.open);
         });
 
+        const isMirrorCategory = mirror && category === mirror.categoryName;
+
         const ul = document.createElement("ul");
         ul.className = "items";
 
@@ -171,7 +184,12 @@
           checkbox.checked = item.checked;
           checkbox.addEventListener("change", () => {
             item.checked = checkbox.checked;
-            li.classList.toggle("checked", item.checked);
+            if (isMirrorCategory && checkbox.checked) {
+              mirrorItems = mirrorItems.filter((i) => i.id !== item.id);
+              li.remove();
+            } else {
+              li.classList.toggle("checked", item.checked);
+            }
             toggleItem(item.id, checkbox.checked);
           });
 
@@ -237,7 +255,11 @@
           deleteBtn.className = "delete-btn";
           deleteBtn.textContent = "✕";
           deleteBtn.addEventListener("click", () => {
-            allItems = allItems.filter((i) => i.id !== item.id);
+            if (isMirrorCategory) {
+              mirrorItems = mirrorItems.filter((i) => i.id !== item.id);
+            } else {
+              allItems = allItems.filter((i) => i.id !== item.id);
+            }
             li.remove();
             deleteItem(item.id);
           });
@@ -249,7 +271,7 @@
         details.appendChild(ul);
         categoriesEl.appendChild(details);
 
-        if (!query && !hideCheckedFilter.checked && window.Sortable) {
+        if (!query && !hideCheckedFilter.checked && !isMirrorCategory && window.Sortable) {
           const instance = window.Sortable.create(ul, {
             animation: 150,
             delay: 120,
@@ -289,6 +311,26 @@
 
       loadingState.hidden = true;
       renderItems(data);
+    }
+
+    async function loadMirrorItems() {
+      if (!mirror) return;
+      const { data, error } = await supabase
+        .from("shopping_items")
+        .select("*")
+        .eq("list_id", mirror.listId)
+        .eq("checked", false)
+        .order("category_order", { ascending: true, nullsFirst: false })
+        .order("category", { ascending: true })
+        .order("position", { ascending: true })
+        .order("text", { ascending: true });
+
+      if (error) {
+        alert("Konnte '" + mirror.categoryName + "' nicht laden: " + error.message);
+        return;
+      }
+      mirrorItems = data;
+      render();
     }
 
     async function addItem(text, category) {
@@ -332,6 +374,17 @@
           () => loadItems()
         )
         .subscribe();
+
+      if (mirror) {
+        supabase
+          .channel(`shopping_items:${mirror.listId}`)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${mirror.listId}` },
+            () => loadMirrorItems()
+          )
+          .subscribe();
+      }
     }
 
     async function init() {
@@ -384,6 +437,7 @@
       });
 
       await loadItems();
+      await loadMirrorItems();
       subscribeToChanges();
     }
 
@@ -400,7 +454,10 @@
     createListController("", primaryListId, { showShareLink: true });
 
     const secondaryListId = await getOrCreateSecondaryListId(primaryListId);
-    createListController("-b", secondaryListId, { showShareLink: false });
+    createListController("-b", secondaryListId, {
+      showShareLink: false,
+      mirror: { listId: primaryListId, categoryName: "Reste von Aldi" },
+    });
 
     const pager = document.getElementById("pager");
     pager.scrollLeft = 0;
