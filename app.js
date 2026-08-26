@@ -382,6 +382,16 @@
       if (failed) alert("Konnte Reihenfolge nicht speichern: " + failed.error.message);
     }
 
+    const localOverrides = new Map();
+
+    function applyOverrides(data) {
+      for (const item of data) {
+        const overrides = localOverrides.get(item.id);
+        if (overrides) Object.assign(item, overrides);
+      }
+      return data;
+    }
+
     async function loadItems() {
       const { data, error } = await supabase
         .from("shopping_items")
@@ -398,7 +408,7 @@
       }
 
       loadingState.hidden = true;
-      renderItems(data);
+      renderItems(applyOverrides(data));
     }
 
     async function loadMirrorItems() {
@@ -417,7 +427,7 @@
         alert("Konnte '" + mirror.categoryName + "' nicht laden: " + error.message);
         return;
       }
-      mirrorItems = data;
+      mirrorItems = applyOverrides(data);
       render();
     }
 
@@ -432,12 +442,21 @@
 
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
+      localOverrides.set(itemId, { ...(localOverrides.get(itemId) || {}), ...fields });
+
       const existing = pendingWrites.get(key);
       if (existing) clearTimeout(existing);
       const timer = setTimeout(async () => {
         pendingWrites.delete(key);
         const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
-        if (error) alert(errorMessage + error.message);
+        if (error) {
+          alert(errorMessage + error.message);
+        }
+        const current = localOverrides.get(itemId);
+        if (current) {
+          for (const field of Object.keys(fields)) delete current[field];
+          if (Object.keys(current).length === 0) localOverrides.delete(itemId);
+        }
       }, 250);
       pendingWrites.set(key, timer);
     }
@@ -460,8 +479,16 @@
     }
 
     async function setAllChecked(checked) {
+      for (const item of allItems) localOverrides.set(item.id, { ...(localOverrides.get(item.id) || {}), checked });
       const { error } = await supabase.from("shopping_items").update({ checked }).eq("list_id", listId);
       if (error) alert("Konnte Liste nicht aktualisieren: " + error.message);
+      for (const item of allItems) {
+        const current = localOverrides.get(item.id);
+        if (current) {
+          delete current.checked;
+          if (Object.keys(current).length === 0) localOverrides.delete(item.id);
+        }
+      }
     }
 
     function subscribeToChanges() {
