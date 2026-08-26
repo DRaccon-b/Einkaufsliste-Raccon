@@ -19,6 +19,17 @@ und Änderungen synchronisieren sich in Echtzeit über Supabase.
 - Diesen Link an andere Personen schicken — sie sehen und bearbeiten dieselbe
   Liste, Häkchen und neue Artikel erscheinen bei allen live.
 
+## Tests
+
+`test/smoke.js` startet die App in einem echten Browser gegen einen
+Supabase-Stub (kein Netzwerkzugriff, keine echten Daten) und prüft Rendering,
+Abhaken, die Spiegel-Kategorien zwischen beiden Listen, Suche und Löschen.
+
+```sh
+npm install playwright
+node test/smoke.js
+```
+
 ## Hinweis zur Sicherheit
 
 Der Zugriffsschutz besteht aktuell nur darin, dass die Listen-ID (Teil des

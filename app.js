@@ -20,6 +20,34 @@
   const pendingWrites = new Map();
   const overrideClearTimers = new Map();
 
+  let toastTimer = null;
+  function notify(message) {
+    let toast = document.getElementById("toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "toast";
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add("visible");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove("visible"), 4000);
+  }
+
+  // Mirrors the server-side sort order: category_order (nulls last),
+  // category, position (nulls last), text.
+  function compareItems(a, b) {
+    const ao = a.category_order ?? Infinity;
+    const bo = b.category_order ?? Infinity;
+    if (ao !== bo) return ao - bo;
+    const byCategory = (a.category || "").localeCompare(b.category || "", "de");
+    if (byCategory !== 0) return byCategory;
+    const ap = a.position ?? Infinity;
+    const bp = b.position ?? Infinity;
+    if (ap !== bp) return ap - bp;
+    return (a.text || "").localeCompare(b.text || "", "de");
+  }
+
   async function createList() {
     const { data, error } = await supabase.from("shopping_lists").insert({}).select().single();
     if (error) {
@@ -86,6 +114,7 @@
     let allItems = [];
     let mirrorItems = [];
     let sortableInstances = [];
+    let renderedCategoryOptions = null;
     const mirror = options && options.mirror;
 
     function getCollapsedSet() {
@@ -101,11 +130,6 @@
       if (collapsed) set.add(category);
       else set.delete(category);
       localStorage.setItem(collapsedKey, JSON.stringify([...set]));
-    }
-
-    function renderItems(items) {
-      allItems = items;
-      render();
     }
 
     function buildItemRow(item, isMirrorCategory) {
@@ -141,20 +165,16 @@
         unitSelect.appendChild(option);
       }
 
-      const starBtn = document.createElement("button");
-      starBtn.className = "star-btn";
-      starBtn.textContent = "★";
-      starBtn.title = "Als wichtig markieren";
-
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "delete-btn";
       deleteBtn.textContent = "✕";
 
-      li.append(switchLabel, span, quantityInput, unitSelect, starBtn, deleteBtn);
+      li.append(switchLabel, span, quantityInput, unitSelect, deleteBtn);
 
-      for (const el of [switchLabel, span, quantityInput, unitSelect, starBtn, deleteBtn]) {
-        el.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
-        el.addEventListener("pointerdown", (e) => e.stopPropagation());
+      // Keep SortableJS from swallowing taps on interactive controls.
+      for (const control of [switchLabel, span, quantityInput, unitSelect, deleteBtn]) {
+        control.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+        control.addEventListener("pointerdown", (e) => e.stopPropagation());
       }
 
       checkbox.addEventListener("change", () => {
@@ -199,14 +219,6 @@
         updateItemFields(current.id, { unit: current.unit });
       });
 
-      starBtn.addEventListener("click", () => {
-        const current = li._item;
-        current.important = !current.important;
-        li.classList.toggle("important", current.important);
-        starBtn.classList.toggle("active", current.important);
-        toggleImportant(current.id, current.important);
-      });
-
       deleteBtn.addEventListener("click", () => {
         const current = li._item;
         if (li._isMirror) {
@@ -222,6 +234,8 @@
       return li;
     }
 
+    // Every DOM write is guarded by an equality check: unconditional writes
+    // trigger needless repaints on iOS, which showed up as visible flicker.
     function updateItemRow(li, item, isMirrorCategory) {
       li._item = item;
       li._isMirror = isMirrorCategory;
@@ -248,9 +262,19 @@
       if (document.activeElement !== unitSelect && unitSelect.value !== (item.unit || "")) {
         unitSelect.value = item.unit || "";
       }
+    }
 
-      const starBtn = li.querySelector(".star-btn");
-      starBtn.classList.toggle("active", !!item.important);
+    function updateCategoryDatalist() {
+      const categoryNames = [...new Set(allItems.map((i) => i.category || "Sonstiges"))];
+      const key = categoryNames.join("\n");
+      if (key === renderedCategoryOptions) return;
+      renderedCategoryOptions = key;
+      categoryList.innerHTML = "";
+      for (const category of categoryNames) {
+        const option = document.createElement("option");
+        option.value = category;
+        categoryList.appendChild(option);
+      }
     }
 
     function render() {
@@ -279,12 +303,7 @@
         }
       }
 
-      categoryList.innerHTML = "";
-      for (const category of new Set(allItems.map((i) => i.category || "Sonstiges"))) {
-        const option = document.createElement("option");
-        option.value = category;
-        categoryList.appendChild(option);
-      }
+      updateCategoryDatalist();
 
       const collapsedSet = getCollapsedSet();
       const existingDetails = new Map();
@@ -390,12 +409,26 @@
     }
 
     async function persistOrder(orderedIds) {
-      const updates = orderedIds.map((id, index) =>
-        supabase.from("shopping_items").update({ position: index }).eq("id", id)
-      );
+      const byId = new Map(allItems.map((i) => [i.id, i]));
+      const updates = [];
+      orderedIds.forEach((id, index) => {
+        const item = byId.get(id);
+        if (!item || item.position === index) return;
+        item.position = index;
+        updates.push(supabase.from("shopping_items").update({ position: index }).eq("id", id));
+      });
+      if (updates.length === 0) return;
+
+      // Keep the local array in sync with the dropped order, otherwise the next
+      // render would briefly snap the rows back to their pre-drag positions.
+      allItems.sort(compareItems);
+
       const results = await Promise.all(updates);
       const failed = results.find((r) => r.error);
-      if (failed) alert("Konnte Reihenfolge nicht speichern: " + failed.error.message);
+      if (failed) {
+        notify("Konnte Reihenfolge nicht speichern: " + failed.error.message);
+        loadItems();
+      }
     }
 
     function applyOverrides(data) {
@@ -417,12 +450,15 @@
         .order("text", { ascending: true });
 
       if (error) {
-        loadingState.textContent = "Fehler beim Laden: " + error.message;
+        // Only surface the error while the initial load is still pending; a
+        // failed background resync keeps showing the current data silently.
+        if (!loadingState.hidden) loadingState.textContent = "Fehler beim Laden: " + error.message;
         return;
       }
 
       loadingState.hidden = true;
-      renderItems(applyOverrides(data));
+      allItems = applyOverrides(data);
+      render();
     }
 
     async function loadMirrorItems() {
@@ -437,11 +473,51 @@
         .order("position", { ascending: true })
         .order("text", { ascending: true });
 
-      if (error) {
-        alert("Konnte '" + mirror.categoryName + "' nicht laden: " + error.message);
+      if (error) return;
+      mirrorItems = applyOverrides(data);
+      render();
+    }
+
+    // Realtime events carry the committed row, so the list can be patched in
+    // place instead of refetching everything — fewer requests, fewer renders,
+    // and no window for a stale read to race the patch.
+    function applyRealtimeEvent(payload) {
+      if (payload.eventType === "DELETE") {
+        const id = payload.old && payload.old.id;
+        if (!id) return loadItems();
+        allItems = allItems.filter((i) => i.id !== id);
+        render();
         return;
       }
-      mirrorItems = applyOverrides(data);
+      const row = payload.new;
+      if (!row || !row.id) return loadItems();
+      applyOverrides([row]);
+      const existing = allItems.find((i) => i.id === row.id);
+      if (existing) Object.assign(existing, row);
+      else allItems.push(row);
+      allItems.sort(compareItems);
+      render();
+    }
+
+    function applyMirrorRealtimeEvent(payload) {
+      if (payload.eventType === "DELETE") {
+        const id = payload.old && payload.old.id;
+        if (!id) return loadMirrorItems();
+        mirrorItems = mirrorItems.filter((i) => i.id !== id);
+        render();
+        return;
+      }
+      const row = payload.new;
+      if (!row || !row.id) return loadMirrorItems();
+      applyOverrides([row]);
+      if (row.checked) {
+        mirrorItems = mirrorItems.filter((i) => i.id !== row.id);
+      } else {
+        const existing = mirrorItems.find((i) => i.id === row.id);
+        if (existing) Object.assign(existing, row);
+        else mirrorItems.push(row);
+        mirrorItems.sort(compareItems);
+      }
       render();
     }
 
@@ -449,7 +525,7 @@
       const { error } = await supabase
         .from("shopping_items")
         .insert({ list_id: listId, text, category: category || "Sonstiges", position: Date.now() });
-      if (error) alert("Konnte Artikel nicht hinzufügen: " + error.message);
+      if (error) notify("Konnte Artikel nicht hinzufügen: " + error.message);
     }
 
     // Clears just the given fields from an item's override once they're safely
@@ -473,11 +549,34 @@
       if (existing) clearTimeout(existing);
       const timer = setTimeout(async () => {
         pendingWrites.delete(key);
-        const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
-        if (error) alert(errorMessage + error.message);
+
+        // If the override no longer matches this write's values, a newer
+        // toggle superseded it while we were waiting — that write wins.
+        const stillCurrent = () => {
+          const current = localOverrides.get(itemId);
+          return !!current && Object.keys(fields).every((f) => current[f] === fields[f]);
+        };
+
+        const maxAttempts = 3;
+        let error = null;
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          if (!stillCurrent()) return;
+          ({ error } = await supabase.from("shopping_items").update(fields).eq("id", itemId));
+          if (!error) break;
+          if (attempt < maxAttempts - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 600 * (attempt + 1)));
+          }
+        }
+        if (error) {
+          notify(errorMessage + error.message);
+          clearOverrideFields(itemId, fields);
+          loadItems();
+          loadMirrorItems();
+          return;
+        }
 
         // Keep the override in place a little longer after the write completes,
-        // so a delayed/out-of-order realtime read can't briefly show stale data.
+        // so a delayed/out-of-order read can't briefly show stale data.
         const clearTimer = setTimeout(() => {
           overrideClearTimers.delete(clearKey);
           clearOverrideFields(itemId, fields);
@@ -491,45 +590,62 @@
       writeFieldsDebounced(itemId, { checked }, "Konnte Status nicht ändern: ");
     }
 
-    function toggleImportant(itemId, important) {
-      writeFieldsDebounced(itemId, { important }, "Konnte Markierung nicht ändern: ");
-    }
-
     function updateItemFields(itemId, fields) {
       writeFieldsDebounced(itemId, fields, "Konnte Angabe nicht speichern: ");
     }
 
     async function deleteItem(itemId) {
       const { error } = await supabase.from("shopping_items").delete().eq("id", itemId);
-      if (error) alert("Konnte Artikel nicht löschen: " + error.message);
+      if (error) {
+        notify("Konnte Artikel nicht löschen: " + error.message);
+        loadItems();
+        loadMirrorItems();
+      }
     }
 
     async function setAllChecked(checked) {
       for (const item of allItems) localOverrides.set(item.id, { ...(localOverrides.get(item.id) || {}), checked });
       const { error } = await supabase.from("shopping_items").update({ checked }).eq("list_id", listId);
-      if (error) alert("Konnte Liste nicht aktualisieren: " + error.message);
+      if (error) {
+        notify("Konnte Liste nicht aktualisieren: " + error.message);
+        loadItems();
+      }
       for (const item of allItems) clearOverrideFields(item.id, { checked });
     }
 
     function subscribeToChanges() {
+      let ownSubscribedOnce = false;
       supabase
         .channel(`shopping_items:${listId}:own${suffix}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${listId}` },
-          () => loadItems()
+          applyRealtimeEvent
         )
-        .subscribe();
+        .subscribe((status) => {
+          // After a reconnect (iOS suspends sockets in the background) events
+          // may have been missed — refetch once to get back in sync.
+          if (status === "SUBSCRIBED") {
+            if (ownSubscribedOnce) loadItems();
+            ownSubscribedOnce = true;
+          }
+        });
 
       if (mirror) {
+        let mirrorSubscribedOnce = false;
         supabase
           .channel(`shopping_items:${mirror.listId}:mirror${suffix}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${mirror.listId}` },
-            () => loadMirrorItems()
+            applyMirrorRealtimeEvent
           )
-          .subscribe();
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") {
+              if (mirrorSubscribedOnce) loadMirrorItems();
+              mirrorSubscribedOnce = true;
+            }
+          });
       }
     }
 
@@ -582,15 +698,32 @@
         setAllChecked(false);
       });
 
-      await loadItems();
-      await loadMirrorItems();
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          loadItems();
+          loadMirrorItems();
+        }
+      });
+
+      await Promise.all([loadItems(), loadMirrorItems()]);
       subscribeToChanges();
     }
 
     init();
   }
 
+  function showVersionFromScriptTag() {
+    const appScript = document.querySelector('script[src*="app.js"]');
+    const version = appScript ? new URL(appScript.src).searchParams.get("v") : null;
+    if (!version) return;
+    for (const tag of document.querySelectorAll(".version-tag")) {
+      tag.textContent = "v" + version;
+    }
+  }
+
   async function init() {
+    showVersionFromScriptTag();
+
     let primaryListId = getListIdFromUrl();
     if (!primaryListId) {
       primaryListId = await createList();

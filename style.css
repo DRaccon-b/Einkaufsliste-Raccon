@@ -9,7 +9,6 @@
   --border: #d9c7a4;
   --important-bg: #ecd9c4;
   --important-border: #cfa877;
-  --star: #a8622f;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,7 +22,6 @@
     --border: #40331f;
     --important-bg: #3a2c1c;
     --important-border: #6b4c26;
-    --star: #d9a15f;
   }
 }
 
@@ -84,7 +82,6 @@ body {
   --border: #e6c6bc;
   --important-bg: #f3d3c8;
   --important-border: #d99e8d;
-  --star: #9c3f2e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -98,7 +95,6 @@ body {
     --border: #4a2b25;
     --important-bg: #422620;
     --important-border: #7a4032;
-    --star: #e08a6b;
   }
 }
 
@@ -466,23 +462,6 @@ ul.items li .unit-select {
   box-sizing: border-box;
 }
 
-ul.items li .star-btn {
-  display: none;
-  background: transparent;
-  color: var(--border);
-  padding: 0;
-  min-width: 36px;
-  min-height: 36px;
-  font-size: 1.1rem;
-  line-height: 1;
-  flex-shrink: 0;
-  touch-action: manipulation;
-}
-
-ul.items li .star-btn.active {
-  color: var(--star);
-}
-
 ul.items li .delete-btn {
   background: transparent;
   color: var(--muted);
@@ -513,4 +492,27 @@ ul.items li .delete-btn {
 .hint {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(8px);
+  background: var(--text);
+  color: var(--bg);
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  max-width: 90vw;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 100;
+}
+
+#toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
