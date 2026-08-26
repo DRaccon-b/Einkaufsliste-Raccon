@@ -107,9 +107,14 @@
       const li = document.createElement("li");
       li.dataset.id = item.id;
 
+      const switchLabel = document.createElement("label");
+      switchLabel.className = "switch";
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.className = "item-checkbox";
+      const switchSlider = document.createElement("span");
+      switchSlider.className = "switch-slider";
+      switchLabel.append(checkbox, switchSlider);
 
       const span = document.createElement("span");
       span.className = "item-text";
@@ -140,9 +145,9 @@
       deleteBtn.className = "delete-btn";
       deleteBtn.textContent = "✕";
 
-      li.append(checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
+      li.append(switchLabel, span, quantityInput, unitSelect, starBtn, deleteBtn);
 
-      for (const el of [checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn]) {
+      for (const el of [switchLabel, span, quantityInput, unitSelect, starBtn, deleteBtn]) {
         el.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
         el.addEventListener("pointerdown", (e) => e.stopPropagation());
       }
