@@ -451,9 +451,12 @@
       setListIdInUrl(primaryListId);
     }
 
-    createListController("", primaryListId, { showShareLink: true });
-
     const secondaryListId = await getOrCreateSecondaryListId(primaryListId);
+
+    createListController("", primaryListId, {
+      showShareLink: true,
+      mirror: { listId: secondaryListId, categoryName: "Reste vom Rewe" },
+    });
     createListController("-b", secondaryListId, {
       showShareLink: false,
       mirror: { listId: primaryListId, categoryName: "Reste von Aldi" },
