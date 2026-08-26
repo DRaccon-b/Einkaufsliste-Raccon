@@ -23,9 +23,12 @@
   const bulkActions = document.getElementById("bulk-actions");
   const checkAllBtn = document.getElementById("check-all-btn");
   const uncheckAllBtn = document.getElementById("uncheck-all-btn");
+  const filterRow = document.getElementById("filter-row");
+  const hideCheckedFilter = document.getElementById("hide-checked-filter");
 
   const LAST_CATEGORY_KEY = "einkaufsliste:lastCategory";
   let collapsedKey = null;
+  let hideCheckedKey = null;
   let allItems = [];
   let sortableInstances = [];
 
@@ -75,9 +78,13 @@
 
   function render() {
     const query = searchInput.value.trim().toLowerCase();
-    const filtered = query
+    let filtered = query
       ? allItems.filter((item) => item.text.toLowerCase().includes(query))
       : allItems;
+
+    if (hideCheckedFilter.checked) {
+      filtered = filtered.filter((item) => !item.checked);
+    }
 
     for (const instance of sortableInstances) instance.destroy();
     sortableInstances = [];
@@ -182,7 +189,7 @@
       details.appendChild(ul);
       categoriesEl.appendChild(details);
 
-      if (!query && window.Sortable) {
+      if (!query && !hideCheckedFilter.checked && window.Sortable) {
         const instance = window.Sortable.create(ul, {
           handle: ".drag-handle",
           animation: 150,
@@ -277,11 +284,18 @@
     }
 
     collapsedKey = `einkaufsliste:collapsed:${listId}`;
+    hideCheckedKey = `einkaufsliste:hideChecked:${listId}`;
 
     shareLinkInput.value = window.location.href;
     shareCard.hidden = false;
     addItemForm.hidden = false;
     searchRow.hidden = false;
+    filterRow.hidden = false;
+    hideCheckedFilter.checked = localStorage.getItem(hideCheckedKey) === "1";
+    hideCheckedFilter.addEventListener("change", () => {
+      localStorage.setItem(hideCheckedKey, hideCheckedFilter.checked ? "1" : "0");
+      render();
+    });
 
     copyLinkBtn.addEventListener("click", async () => {
       await navigator.clipboard.writeText(shareLinkInput.value);
