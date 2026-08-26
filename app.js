@@ -440,9 +440,15 @@
 
     const pendingWrites = new Map();
 
+    const overrideClearTimers = new Map();
+
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
       localOverrides.set(itemId, { ...(localOverrides.get(itemId) || {}), ...fields });
+
+      const clearKey = itemId + ":" + Object.keys(fields).sort().join(",") + ":clear";
+      const existingClear = overrideClearTimers.get(clearKey);
+      if (existingClear) clearTimeout(existingClear);
 
       const existing = pendingWrites.get(key);
       if (existing) clearTimeout(existing);
@@ -452,11 +458,15 @@
         if (error) {
           alert(errorMessage + error.message);
         }
-        const current = localOverrides.get(itemId);
-        if (current) {
-          for (const field of Object.keys(fields)) delete current[field];
-          if (Object.keys(current).length === 0) localOverrides.delete(itemId);
-        }
+        const clearTimer = setTimeout(() => {
+          overrideClearTimers.delete(clearKey);
+          const current = localOverrides.get(itemId);
+          if (current) {
+            for (const field of Object.keys(fields)) delete current[field];
+            if (Object.keys(current).length === 0) localOverrides.delete(itemId);
+          }
+        }, 2500);
+        overrideClearTimers.set(clearKey, clearTimer);
       }, 250);
       pendingWrites.set(key, timer);
     }
