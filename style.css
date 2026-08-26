@@ -352,12 +352,17 @@ ul.items li input[type="checkbox"]:checked::after {
 
 ul.items li .quantity-input,
 ul.items li .unit-select {
+  -webkit-appearance: none;
+  appearance: none;
   width: 52px;
-  min-height: 36px;
+  height: 36px;
   flex-shrink: 0;
-  padding: 4px 2px;
+  margin: 0;
+  padding: 0 4px;
   font-size: 0.8rem;
+  font-family: inherit;
   text-align: center;
+  text-align-last: center;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card);

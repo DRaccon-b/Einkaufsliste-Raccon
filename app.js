@@ -163,7 +163,6 @@
         quantityInput.type = "text";
         quantityInput.inputMode = "decimal";
         quantityInput.className = "quantity-input";
-        quantityInput.placeholder = "Menge";
         quantityInput.value = item.quantity || "";
         quantityInput.addEventListener("change", () => {
           item.quantity = quantityInput.value.trim() || null;
@@ -176,7 +175,7 @@
         for (const u of unitOptions) {
           const option = document.createElement("option");
           option.value = u;
-          option.textContent = u || "–";
+          option.textContent = u;
           unitSelect.appendChild(option);
         }
         unitSelect.value = item.unit || "";
