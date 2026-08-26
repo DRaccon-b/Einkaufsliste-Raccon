@@ -158,6 +158,24 @@
         const span = document.createElement("span");
         span.className = "item-text";
         span.textContent = item.text;
+        span.contentEditable = "true";
+        span.spellcheck = false;
+        span.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            span.blur();
+          }
+        });
+        span.addEventListener("blur", () => {
+          const newText = span.textContent.trim();
+          if (!newText) {
+            span.textContent = item.text;
+            return;
+          }
+          if (newText === item.text) return;
+          item.text = newText;
+          updateItemFields(item.id, { text: newText });
+        });
 
         const quantityInput = document.createElement("input");
         quantityInput.type = "text";
@@ -216,7 +234,7 @@
           animation: 150,
           delay: 120,
           delayOnTouchOnly: true,
-          filter: "input, select, button",
+          filter: "input, select, button, .item-text",
           preventOnFilter: false,
           onEnd: () => persistOrder(category, [...ul.children].map((li) => li.dataset.id)),
         });

@@ -294,6 +294,12 @@ ul.items li .item-text {
   word-break: break-word;
   min-width: 0;
   line-height: 1.35;
+  outline: none;
+  border-bottom: 1px dashed transparent;
+}
+
+ul.items li .item-text:focus {
+  border-bottom-color: var(--border);
 }
 
 ul.items li.checked {
