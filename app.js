@@ -163,6 +163,32 @@
         span.className = "item-text";
         span.textContent = item.text;
 
+        const quantityInput = document.createElement("input");
+        quantityInput.type = "text";
+        quantityInput.inputMode = "decimal";
+        quantityInput.className = "quantity-input";
+        quantityInput.placeholder = "Menge";
+        quantityInput.value = item.quantity || "";
+        quantityInput.addEventListener("change", () => {
+          item.quantity = quantityInput.value.trim() || null;
+          updateItemFields(item.id, { quantity: item.quantity });
+        });
+
+        const unitSelect = document.createElement("select");
+        unitSelect.className = "unit-select";
+        const unitOptions = ["", "Stk", "g", "kg", "ml", "L", "Bund", "Netz", "Paket", "Dose"];
+        for (const u of unitOptions) {
+          const option = document.createElement("option");
+          option.value = u;
+          option.textContent = u || "–";
+          unitSelect.appendChild(option);
+        }
+        unitSelect.value = item.unit || "";
+        unitSelect.addEventListener("change", () => {
+          item.unit = unitSelect.value || null;
+          updateItemFields(item.id, { unit: item.unit });
+        });
+
         const starBtn = document.createElement("button");
         starBtn.className = "star-btn" + (item.important ? " active" : "");
         starBtn.textContent = "★";
@@ -183,7 +209,7 @@
           deleteItem(item.id);
         });
 
-        li.append(dragHandle, checkbox, span, starBtn, deleteBtn);
+        li.append(dragHandle, checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
         ul.appendChild(li);
       }
 
@@ -250,6 +276,11 @@
       .update({ important })
       .eq("id", itemId);
     if (error) alert("Konnte Markierung nicht ändern: " + error.message);
+  }
+
+  async function updateItemFields(itemId, fields) {
+    const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
+    if (error) alert("Konnte Angabe nicht speichern: " + error.message);
   }
 
   async function deleteItem(itemId) {

@@ -20,6 +20,8 @@ alter table shopping_items add column if not exists category text not null defau
 alter table shopping_items add column if not exists important boolean not null default false;
 alter table shopping_items add column if not exists seq bigserial;
 alter table shopping_items add column if not exists category_order integer;
+alter table shopping_items add column if not exists quantity text;
+alter table shopping_items add column if not exists unit text;
 
 alter table shopping_lists enable row level security;
 alter table shopping_items enable row level security;

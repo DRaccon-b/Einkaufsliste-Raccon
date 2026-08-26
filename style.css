@@ -364,6 +364,31 @@ ul.items li input[type="checkbox"]:checked::after {
   transform: rotate(45deg);
 }
 
+ul.items li .quantity-input {
+  width: 44px;
+  min-height: 36px;
+  flex-shrink: 0;
+  padding: 4px 4px;
+  font-size: 0.85rem;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+}
+
+ul.items li .unit-select {
+  width: 52px;
+  min-height: 36px;
+  flex-shrink: 0;
+  padding: 4px 2px;
+  font-size: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+}
+
 ul.items li .star-btn {
   background: transparent;
   color: var(--border);
