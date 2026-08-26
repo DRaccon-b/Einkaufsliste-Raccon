@@ -62,12 +62,22 @@ window.confirm = () => true;
         return { data: b._single ? found[0] || null : found, error: null };
       }
       if (b._op === "insert") {
+        // Tests can set window.__store.__insertDelayMs to simulate a slow
+        // network and verify the app doesn't just sit there waiting.
+        if (store.__insertDelayMs) await new Promise((r) => setTimeout(r, store.__insertDelayMs));
         const row = { id: "new-" + Math.random().toString(36).slice(2, 8), checked: false, important: false, quantity: null, unit: null, category_order: null, ...b._payload };
         rows.push(row);
         dispatch("INSERT", row, null);
         return { data: b._single ? { ...row } : [{ ...row }], error: null };
       }
       if (b._op === "update") {
+        // Tests can set window.__store.__failUpdatesRemaining to simulate a
+        // flaky backend without mutating any data, to exercise retry/revert.
+        if (store.__failUpdatesRemaining > 0) {
+          store.__failUpdatesRemaining--;
+          window.__log.writes.push({ table, payload: b._payload, count: 0, failed: true });
+          return { data: null, error: { message: "stub-forced-failure" } };
+        }
         const hit = rows.filter(matches);
         window.__log.writes.push({ table, payload: b._payload, count: hit.length });
         for (const row of hit) {

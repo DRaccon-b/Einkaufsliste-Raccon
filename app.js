@@ -182,11 +182,12 @@
         current.checked = checkbox.checked;
         if (li._isMirror && checkbox.checked) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
-          li.remove();
-        } else {
-          li.classList.toggle("checked", current.checked);
         }
         toggleItem(current.id, checkbox.checked);
+        // Re-render synchronously so the "nur unerledigte" filter and the
+        // category count reflect the change immediately, not just after the
+        // debounced write echoes back over realtime.
+        render();
       });
 
       span.addEventListener("keydown", (e) => {
@@ -226,8 +227,8 @@
         } else {
           allItems = allItems.filter((i) => i.id !== current.id);
         }
-        li.remove();
         deleteItem(current.id);
+        render();
       });
 
       updateItemRow(li, item, isMirrorCategory);
@@ -356,20 +357,30 @@
         const existingRows = new Map();
         for (const li of ul.children) existingRows.set(li.dataset.id, li);
 
-        let prevLi = null;
-        for (const item of categoryItems) {
-          let li = existingRows.get(item.id);
-          if (li) {
-            existingRows.delete(item.id);
-            updateItemRow(li, item, isMirrorCategory);
-          } else {
-            li = buildItemRow(item, isMirrorCategory);
+        // While this list is mid-drag, SortableJS owns the DOM order — only
+        // refresh existing rows' content, never reposition or remove rows
+        // out from under the gesture. onEnd re-renders once it settles.
+        if (ul._dragging) {
+          for (const item of categoryItems) {
+            const li = existingRows.get(item.id);
+            if (li) updateItemRow(li, item, isMirrorCategory);
           }
-          const wantedNext = prevLi ? prevLi.nextSibling : ul.firstChild;
-          if (wantedNext !== li) ul.insertBefore(li, wantedNext);
-          prevLi = li;
+        } else {
+          let prevLi = null;
+          for (const item of categoryItems) {
+            let li = existingRows.get(item.id);
+            if (li) {
+              existingRows.delete(item.id);
+              updateItemRow(li, item, isMirrorCategory);
+            } else {
+              li = buildItemRow(item, isMirrorCategory);
+            }
+            const wantedNext = prevLi ? prevLi.nextSibling : ul.firstChild;
+            if (wantedNext !== li) ul.insertBefore(li, wantedNext);
+            prevLi = li;
+          }
+          for (const leftover of existingRows.values()) leftover.remove();
         }
-        for (const leftover of existingRows.values()) leftover.remove();
 
         if (prevDetails) {
           if (prevDetails.nextSibling !== details) categoriesEl.insertBefore(details, prevDetails.nextSibling);
@@ -378,20 +389,35 @@
         }
         prevDetails = details;
 
-        for (const instance of sortableInstances) {
-          if (instance.el === ul) instance.destroy();
-        }
-        sortableInstances = sortableInstances.filter((i) => i.el !== ul);
-        if (!query && !hideCheckedFilter.checked && !isMirrorCategory && window.Sortable) {
-          const instance = window.Sortable.create(ul, {
-            animation: 150,
-            delay: 120,
-            delayOnTouchOnly: true,
-            filter: "input, select, button, .item-text",
-            preventOnFilter: false,
-            onEnd: () => persistOrder([...ul.children].map((li) => li.dataset.id)),
-          });
-          sortableInstances.push(instance);
+        // Only tear down and recreate SortableJS when its eligibility
+        // actually changes. Recreating it on every render — as before —
+        // could destroy the instance out from under an in-progress drag.
+        const sortableEligible = !query && !hideCheckedFilter.checked && !isMirrorCategory && !!window.Sortable;
+        if (ul._sortableEligible !== sortableEligible) {
+          ul._sortableEligible = sortableEligible;
+          const existingInstance = sortableInstances.find((i) => i.el === ul);
+          if (existingInstance) {
+            existingInstance.destroy();
+            sortableInstances = sortableInstances.filter((i) => i !== existingInstance);
+          }
+          if (sortableEligible) {
+            const instance = window.Sortable.create(ul, {
+              animation: 150,
+              delay: 120,
+              delayOnTouchOnly: true,
+              filter: "input, select, button, .item-text",
+              preventOnFilter: false,
+              onStart: () => {
+                ul._dragging = true;
+              },
+              onEnd: () => {
+                ul._dragging = false;
+                persistOrder([...ul.children].map((li) => li.dataset.id));
+                render();
+              },
+            });
+            sortableInstances.push(instance);
+          }
         }
       }
 
@@ -492,9 +518,21 @@
       const row = payload.new;
       if (!row || !row.id) return loadItems();
       applyOverrides([row]);
-      const existing = allItems.find((i) => i.id === row.id);
-      if (existing) Object.assign(existing, row);
-      else allItems.push(row);
+      let existing = allItems.find((i) => i.id === row.id);
+      if (!existing && payload.eventType === "INSERT") {
+        // This may be the server echo of our own optimistic addItem() insert,
+        // still sitting under its temporary id — adopt it instead of adding
+        // a second, momentarily duplicate row.
+        existing = allItems.find(
+          (i) => i._pending && i.text === row.text && i.category === row.category && i.position === row.position
+        );
+      }
+      if (existing) {
+        Object.assign(existing, row);
+        delete existing._pending;
+      } else {
+        allItems.push(row);
+      }
       allItems.sort(compareItems);
       render();
     }
@@ -522,10 +560,50 @@
     }
 
     async function addItem(text, category) {
-      const { error } = await supabase
+      // Show the new item immediately instead of waiting for a full
+      // round-trip; applyRealtimeEvent() reconciles it with the server-
+      // confirmed row once either the insert response or its realtime
+      // echo arrives, whichever comes first.
+      const tempId = "temp-" + Math.random().toString(36).slice(2, 10);
+      const optimisticItem = {
+        id: tempId,
+        list_id: listId,
+        category: category || "Sonstiges",
+        category_order: null,
+        position: Date.now(),
+        text,
+        quantity: null,
+        unit: null,
+        checked: false,
+        important: false,
+        _pending: true,
+      };
+      allItems.push(optimisticItem);
+      allItems.sort(compareItems);
+      render();
+
+      const { data, error } = await supabase
         .from("shopping_items")
-        .insert({ list_id: listId, text, category: category || "Sonstiges", position: Date.now() });
-      if (error) notify("Konnte Artikel nicht hinzufügen: " + error.message);
+        .insert({ list_id: listId, text, category: optimisticItem.category, position: optimisticItem.position })
+        .select()
+        .single();
+
+      const index = allItems.findIndex((i) => i.id === tempId);
+      if (error) {
+        notify("Konnte Artikel nicht hinzufügen: " + error.message);
+        if (index !== -1) allItems.splice(index, 1);
+        render();
+        return;
+      }
+      if (index === -1) return; // realtime echo already reconciled it
+
+      if (allItems.some((i) => i.id === data.id)) {
+        allItems.splice(index, 1); // realtime echo won the race; drop our temp copy
+      } else {
+        allItems[index] = data;
+      }
+      allItems.sort(compareItems);
+      render();
     }
 
     // Clears just the given fields from an item's override once they're safely
@@ -537,13 +615,33 @@
       if (Object.keys(current).length === 0) localOverrides.delete(itemId);
     }
 
+    function cancelOverrideClear(itemId, fields) {
+      const clearKey = itemId + ":" + Object.keys(fields).sort().join(",") + ":clear";
+      const existing = overrideClearTimers.get(clearKey);
+      if (existing) {
+        clearTimeout(existing);
+        overrideClearTimers.delete(clearKey);
+      }
+      return clearKey;
+    }
+
+    // Keeps an override in place for a grace period after its write is
+    // confirmed, so a delayed/out-of-order read arriving in that window
+    // can't briefly show stale data — the exact race behind the original
+    // checkbox-flicker bug.
+    function scheduleOverrideClear(itemId, fields, delay) {
+      const clearKey = cancelOverrideClear(itemId, fields);
+      const timer = setTimeout(() => {
+        overrideClearTimers.delete(clearKey);
+        clearOverrideFields(itemId, fields);
+      }, delay);
+      overrideClearTimers.set(clearKey, timer);
+    }
+
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
       localOverrides.set(itemId, { ...(localOverrides.get(itemId) || {}), ...fields });
-
-      const clearKey = key + ":clear";
-      const existingClear = overrideClearTimers.get(clearKey);
-      if (existingClear) clearTimeout(existingClear);
+      cancelOverrideClear(itemId, fields);
 
       const existing = pendingWrites.get(key);
       if (existing) clearTimeout(existing);
@@ -575,13 +673,7 @@
           return;
         }
 
-        // Keep the override in place a little longer after the write completes,
-        // so a delayed/out-of-order read can't briefly show stale data.
-        const clearTimer = setTimeout(() => {
-          overrideClearTimers.delete(clearKey);
-          clearOverrideFields(itemId, fields);
-        }, 4000);
-        overrideClearTimers.set(clearKey, clearTimer);
+        scheduleOverrideClear(itemId, fields, 4000);
       }, 250);
       pendingWrites.set(key, timer);
     }
@@ -604,13 +696,18 @@
     }
 
     async function setAllChecked(checked) {
-      for (const item of allItems) localOverrides.set(item.id, { ...(localOverrides.get(item.id) || {}), checked });
+      for (const item of allItems) {
+        localOverrides.set(item.id, { ...(localOverrides.get(item.id) || {}), checked });
+        cancelOverrideClear(item.id, { checked });
+      }
       const { error } = await supabase.from("shopping_items").update({ checked }).eq("list_id", listId);
       if (error) {
         notify("Konnte Liste nicht aktualisieren: " + error.message);
+        for (const item of allItems) clearOverrideFields(item.id, { checked });
         loadItems();
+        return;
       }
-      for (const item of allItems) clearOverrideFields(item.id, { checked });
+      for (const item of allItems) scheduleOverrideClear(item.id, { checked }, 4000);
     }
 
     function subscribeToChanges() {
@@ -672,6 +769,10 @@
         const text = itemTextInput.value.trim();
         const category = itemCategoryInput.value.trim();
         if (!text) return;
+        if (mirror && category === mirror.categoryName) {
+          notify(`"${category}" ist als Kategoriename für die andere Liste reserviert.`);
+          return;
+        }
         itemTextInput.value = "";
         if (category) localStorage.setItem(lastCategoryKey, category);
         await addItem(text, category);

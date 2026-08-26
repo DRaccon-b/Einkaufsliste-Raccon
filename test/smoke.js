@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.17.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.18.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -136,6 +136,130 @@ function check(name, ok, detail) {
   check("Schnelles 5x Tippen: UI und Store stimmen überein", domChecked === storeChecked,
     "dom=" + domChecked + " store=" + storeChecked);
   check("Schnelles 5x Tippen erzeugt nur einen Write", burst === 1, "writes=" + burst);
+
+  // 12. checking an item while "nur unerledigte anzeigen" is on must hide it
+  // immediately, not only after the write round-trip / realtime echo lands.
+  await page.check("#hide-checked-filter");
+  await page.waitForTimeout(100);
+  const filterTargetLi = await page.$("#categories li:not(.checked)");
+  const filterTargetId = await filterTargetLi.evaluate((li) => li.dataset.id);
+  const filterTargetSwitch = await filterTargetLi.$(".switch");
+  await filterTargetSwitch.click();
+  await page.waitForTimeout(80); // well under the 250ms write debounce
+  const hiddenImmediately = await page.$(`#categories li[data-id="${filterTargetId}"]`);
+  check("Abhaken mit aktivem Filter blendet den Artikel sofort aus", hiddenImmediately === null, "id=" + filterTargetId);
+  await page.uncheck("#hide-checked-filter");
+  await page.waitForTimeout(150);
+
+  // 13. optimistic add: the new item appears immediately, well before the
+  // simulated slow insert resolves, and settles onto the real row afterward
+  // without ever leaving a duplicate.
+  await page.evaluate(() => { window.__store.__insertDelayMs = 400; });
+  await page.fill("#item-text", "Optimistisch");
+  await page.click('#add-item-form button[type="submit"]');
+  await page.waitForTimeout(80);
+  const immediateAdd = await page.$$eval("#categories li .item-text", (els) => els.map((e) => e.textContent));
+  check("Neuer Artikel erscheint sofort, ohne auf den Server zu warten",
+    immediateAdd.includes("Optimistisch"), JSON.stringify(immediateAdd));
+
+  await page.waitForTimeout(600);
+  const afterSettle = await page.$$eval("#categories li .item-text", (els) => els.map((e) => e.textContent));
+  const occurrences = afterSettle.filter((t) => t === "Optimistisch").length;
+  check("Nach dem Settle steht der Artikel genau einmal da (kein Duplikat)",
+    occurrences === 1, JSON.stringify(afterSettle));
+  await page.evaluate(() => { window.__store.__insertDelayMs = 0; });
+
+  // 14. a category name that collides with the mirror category is rejected
+  // client-side, so a real item can never be hidden behind mirrored ones.
+  const beforeReserved = await page.evaluate(() => window.__store.shopping_items.length);
+  await page.fill("#item-text", "Sollte nicht ankommen");
+  await page.fill("#item-category", "Reste vom Rewe");
+  await page.click('#add-item-form button[type="submit"]');
+  await page.waitForTimeout(200);
+  const afterReserved = await page.evaluate(() => window.__store.shopping_items.length);
+  check("Artikel mit reserviertem Kategorienamen wird nicht angelegt",
+    afterReserved === beforeReserved, `vorher=${beforeReserved} nachher=${afterReserved}`);
+  const reservedToast = await page.textContent("#toast");
+  check("Hinweis-Toast erklärt die Ablehnung", /reserviert/i.test(reservedToast || ""), "toast=" + reservedToast);
+  await page.fill("#item-text", "");
+  await page.fill("#item-category", "");
+
+  // 15. bulk check-all/uncheck-all still goes through the shared override
+  // helpers after the refactor (setAllChecked used to clear its overrides
+  // immediately instead of using the same 4s grace period as single
+  // toggles — this only re-checks the write still lands correctly; the
+  // timing guarantee itself needs a real, lagging backend to observe).
+  await page.click("#check-all-btn"); // window.confirm is stubbed to always return true
+  await page.waitForTimeout(700);
+  // Scoped to list A's own rows: the mirror category shows list B's items
+  // (untouched by list A's check-all) inside the same #categories container.
+  const bulkPersisted = await page.evaluate(() =>
+    window.__store.shopping_items.filter((i) => i.list_id === "LIST-A").every((i) => i.checked)
+  );
+  const bulkRendered = await page.$$eval(
+    '#categories details:not([data-category="Reste vom Rewe"]) li:not(.checked)',
+    (els) => els.length
+  );
+  check("Alles-abhaken schreibt alle Artikel durch und die UI zeigt es", bulkPersisted && bulkRendered === 0);
+
+  // 16. concurrent edit during an active drag must not disturb it: an insert
+  // arriving mid-drag should only appear once the drag has ended.
+  const dragUlSelector = '#categories details[data-category="Obst und Gemüse"] ul';
+  await page.evaluate((sel) => { document.querySelector(sel)._dragging = true; }, dragUlSelector);
+  await page.evaluate(async () => {
+    // The stub's query builder is a thenable — it only actually runs once
+    // awaited or `.then()`'d, so this must be awaited to take effect.
+    await window.supabase.createClient().from("shopping_items").insert({
+      id: "drag-test-1", list_id: "LIST-A", category: "Obst und Gemüse", category_order: 0,
+      position: 99, text: "Mid-Drag-Artikel", checked: false, important: false, quantity: null, unit: null,
+    });
+  });
+  await page.waitForTimeout(200);
+  const midDragVisible = await page.$('#categories li[data-id="drag-test-1"]');
+  check("Während eines Drags bleibt ein neu eintreffender Artikel unsichtbar (kein Ruckeln)", midDragVisible === null);
+  const midDragInMemory = await page.evaluate(() => window.__store.shopping_items.some((i) => i.id === "drag-test-1"));
+  check("...obwohl er im Hintergrund bereits eingetroffen ist (kein Datenverlust)", midDragInMemory === true);
+
+  await page.evaluate((sel) => { document.querySelector(sel)._dragging = false; }, dragUlSelector);
+  await page.evaluate(async () => {
+    await window.supabase.createClient().from("shopping_items").update({ important: false }).eq("id", "a2");
+  });
+  await page.waitForTimeout(200);
+  const afterDragVisible = await page.$('#categories li[data-id="drag-test-1"]');
+  check("Nach Drag-Ende erscheint der zwischenzeitlich eingetroffene Artikel", afterDragVisible !== null);
+
+  // 17. a write that fails transiently (flaky connection) must retry and
+  // still land, without the user having to notice or retry manually.
+  const dragSwitch = await page.$('#categories li[data-id="drag-test-1"] .switch');
+  await page.evaluate(() => { window.__store.__failUpdatesRemaining = 2; });
+  await dragSwitch.click(); // optimistic checked: false -> true
+  await page.waitForTimeout(80);
+  const optimisticDespiteUpcomingFailure = await page.$eval(
+    '#categories li[data-id="drag-test-1"]', (li) => li.className
+  );
+  check("Optimistischer Wert erscheint sofort, obwohl der Schreibversuch gleich scheitert",
+    optimisticDespiteUpcomingFailure.includes("checked"));
+
+  await page.waitForTimeout(2600); // 250ms debounce + two backoffs (600ms, 1200ms) before the 3rd attempt
+  const recoveredStore = await page.evaluate(() => window.__store.shopping_items.find((i) => i.id === "drag-test-1").checked);
+  const recoveredDom = await page.$eval('#categories li[data-id="drag-test-1"] .item-checkbox', (e) => e.checked);
+  check("Nach zwei Fehlversuchen setzt sich der dritte Schreibversuch durch",
+    recoveredStore === true && recoveredDom === true, `store=${recoveredStore} dom=${recoveredDom}`);
+
+  // 18. a write that keeps failing must give up, tell the user, and roll the
+  // UI back to the last confirmed server value instead of showing a value
+  // that was never actually saved.
+  await page.evaluate(() => { window.__store.__failUpdatesRemaining = 99; });
+  await dragSwitch.click(); // optimistic checked: true -> false, but this write will never succeed
+  await page.waitForTimeout(2600);
+  const revertedStore = await page.evaluate(() => window.__store.shopping_items.find((i) => i.id === "drag-test-1").checked);
+  const revertedDom = await page.$eval('#categories li[data-id="drag-test-1"] .item-checkbox', (e) => e.checked);
+  check("Bei dauerhaftem Fehlschlag bleibt der zuletzt bestätigte Serverwert erhalten",
+    revertedStore === true && revertedDom === true, `store=${revertedStore} dom=${revertedDom}`);
+  const failToast = await page.textContent("#toast");
+  check("Fehler-Toast informiert über den dauerhaften Schreibfehler",
+    /Konnte Status nicht/i.test(failToast || ""), "toast=" + failToast);
+  await page.evaluate(() => { window.__store.__failUpdatesRemaining = 0; });
 
   // 12. no runtime errors, no alerts (blocked CDN requests are expected)
   const appLog = await page.evaluate(() => window.__log);
