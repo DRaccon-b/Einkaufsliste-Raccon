@@ -390,6 +390,7 @@ ul.items li .unit-select {
 }
 
 ul.items li .star-btn {
+  display: none;
   background: transparent;
   color: var(--border);
   padding: 0;
