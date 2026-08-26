@@ -155,7 +155,7 @@
         checkbox.checked = item.checked;
         checkbox.addEventListener("change", () => {
           item.checked = checkbox.checked;
-          render();
+          li.classList.toggle("checked", item.checked);
           toggleItem(item.id, checkbox.checked);
         });
 
@@ -169,7 +169,8 @@
         starBtn.title = "Als wichtig markieren";
         starBtn.addEventListener("click", () => {
           item.important = !item.important;
-          render();
+          li.classList.toggle("important", item.important);
+          starBtn.classList.toggle("active", item.important);
           toggleImportant(item.id, item.important);
         });
 
@@ -178,7 +179,7 @@
         deleteBtn.textContent = "✕";
         deleteBtn.addEventListener("click", () => {
           allItems = allItems.filter((i) => i.id !== item.id);
-          render();
+          li.remove();
           deleteItem(item.id);
         });
 
