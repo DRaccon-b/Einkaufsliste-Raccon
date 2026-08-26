@@ -1,8 +1,8 @@
 :root {
   color-scheme: light dark;
   --bg: #f3ece0;
-  --card: #ede2cd;
-  --card-alt: #e4d3b3;
+  --card: #f1e8d8;
+  --card-alt: #ddc79c;
   --text: #3b3226;
   --muted: #8a7c66;
   --accent: #8a5a35;
@@ -16,7 +16,7 @@
   :root {
     --bg: #1e1812;
     --card: #2a2119;
-    --card-alt: #34291d;
+    --card-alt: #3d2f1e;
     --text: #ece2d2;
     --muted: #a3927a;
     --accent: #c99a67;
@@ -285,7 +285,7 @@ ul.items li {
   padding: 8px 10px;
 }
 
-ul.items li:nth-child(even):not(.checked):not(.important) {
+ul.items li:nth-child(even):not(.important) {
   background: var(--card-alt);
 }
 
@@ -297,8 +297,7 @@ ul.items li .item-text {
 }
 
 ul.items li.checked {
-  background: transparent;
-  border-color: transparent;
+  opacity: 0.65;
 }
 
 ul.items li.checked .item-text {
