@@ -13,6 +13,20 @@
     return document.getElementById(id);
   }
 
+  const debugPanel = document.createElement("div");
+  debugPanel.id = "debug-panel";
+  debugPanel.style.cssText =
+    "position:fixed;bottom:0;left:0;right:0;max-height:35vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:6px;z-index:9999;white-space:pre-wrap;";
+  document.body.appendChild(debugPanel);
+  const debugStart = Date.now();
+  function debugLog(msg) {
+    const line = document.createElement("div");
+    line.textContent = `+${((Date.now() - debugStart) / 1000).toFixed(2)}s ${msg}`;
+    debugPanel.appendChild(line);
+    debugPanel.scrollTop = debugPanel.scrollHeight;
+    while (debugPanel.children.length > 60) debugPanel.removeChild(debugPanel.firstChild);
+  }
+
   async function createList() {
     const { data, error } = await supabase.from("shopping_lists").insert({}).select().single();
     if (error) {
@@ -147,6 +161,7 @@
 
       checkbox.addEventListener("change", () => {
         const current = li._item;
+        debugLog(`[${suffix || "A"}] CHANGE event: "${current.text}" -> ${checkbox.checked}`);
         current.checked = checkbox.checked;
         if (li._isMirror && checkbox.checked) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
@@ -240,6 +255,8 @@
     }
 
     function render() {
+      const obstNow = allItems.find((i) => i.text === "Obst");
+      if (obstNow) debugLog(`[${suffix || "A"}] render() called, Obst.checked=${obstNow.checked}`);
       const query = searchInput.value.trim().toLowerCase();
       let filtered = query ? allItems.filter((item) => item.text.toLowerCase().includes(query)) : allItems;
 
@@ -387,12 +404,16 @@
     function applyOverrides(data) {
       for (const item of data) {
         const overrides = localOverrides.get(item.id);
-        if (overrides) Object.assign(item, overrides);
+        if (overrides) {
+          debugLog(`[${suffix || "A"}] OVERRIDE applied to "${item.text}": ${JSON.stringify(overrides)} (server had checked=${item.checked})`);
+          Object.assign(item, overrides);
+        }
       }
       return data;
     }
 
     async function loadItems() {
+      debugLog(`[${suffix || "A"}] loadItems() fetching...`);
       const { data, error } = await supabase
         .from("shopping_items")
         .select("*")
@@ -407,6 +428,8 @@
         return;
       }
 
+      const obst = data.find((i) => i.text === "Obst");
+      if (obst) debugLog(`[${suffix || "A"}] loadItems() got Obst checked=${obst.checked}`);
       loadingState.hidden = true;
       renderItems(applyOverrides(data));
     }
@@ -445,6 +468,7 @@
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
       localOverrides.set(itemId, { ...(localOverrides.get(itemId) || {}), ...fields });
+      debugLog(`[${suffix || "A"}] writeFieldsDebounced scheduled: ${JSON.stringify(fields)} for item ${itemId.slice(0, 8)}`);
 
       const clearKey = itemId + ":" + Object.keys(fields).sort().join(",") + ":clear";
       const existingClear = overrideClearTimers.get(clearKey);
@@ -454,11 +478,14 @@
       if (existing) clearTimeout(existing);
       const timer = setTimeout(async () => {
         pendingWrites.delete(key);
+        debugLog(`[${suffix || "A"}] WRITE sending: ${JSON.stringify(fields)} for item ${itemId.slice(0, 8)}`);
         const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
+        debugLog(`[${suffix || "A"}] WRITE done: ${JSON.stringify(fields)} error=${error ? error.message : "none"}`);
         if (error) {
           alert(errorMessage + error.message);
         }
         const clearTimer = setTimeout(() => {
+          debugLog(`[${suffix || "A"}] override CLEARED for item ${itemId.slice(0, 8)}: ${JSON.stringify(fields)}`);
           overrideClearTimers.delete(clearKey);
           const current = localOverrides.get(itemId);
           if (current) {
@@ -507,7 +534,10 @@
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${listId}` },
-          () => loadItems()
+          (payload) => {
+            debugLog(`[${suffix || "A"}] REALTIME own event: ${payload.eventType} on "${payload.new?.text || payload.old?.text}" checked=${payload.new?.checked}`);
+            loadItems();
+          }
         )
         .subscribe();
 
@@ -517,7 +547,10 @@
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${mirror.listId}` },
-            () => loadMirrorItems()
+            (payload) => {
+              debugLog(`[${suffix || "A"}] REALTIME mirror event: ${payload.eventType} on "${payload.new?.text || payload.old?.text}" checked=${payload.new?.checked}`);
+              loadMirrorItems();
+            }
           )
           .subscribe();
       }
