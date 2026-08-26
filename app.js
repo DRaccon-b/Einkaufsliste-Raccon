@@ -450,7 +450,7 @@
 
     function subscribeToChanges() {
       supabase
-        .channel(`shopping_items:${listId}`)
+        .channel(`shopping_items:${listId}:own${suffix}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${listId}` },
@@ -460,7 +460,7 @@
 
       if (mirror) {
         supabase
-          .channel(`shopping_items:${mirror.listId}`)
+          .channel(`shopping_items:${mirror.listId}:mirror${suffix}`)
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${mirror.listId}` },
