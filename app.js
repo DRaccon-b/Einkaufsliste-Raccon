@@ -465,7 +465,7 @@
             for (const field of Object.keys(fields)) delete current[field];
             if (Object.keys(current).length === 0) localOverrides.delete(itemId);
           }
-        }, 2500);
+        }, 4000);
         overrideClearTimers.set(clearKey, clearTimer);
       }, 250);
       pendingWrites.set(key, timer);
