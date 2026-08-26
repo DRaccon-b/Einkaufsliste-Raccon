@@ -1,4 +1,51 @@
 (function () {
+  const THEME_COLOR_KEY = "einkaufsliste:themeColor";
+
+  // The color picker only ever needs the DOM and localStorage, so it's set
+  // up independently of Supabase and still works if config.js is missing.
+  function setupSettingsPanel() {
+    const homeBtn = document.getElementById("home-btn");
+    const settingsBtn = document.getElementById("settings-btn");
+    const panel = document.getElementById("settings-panel");
+    const swatches = document.querySelectorAll(".theme-swatch");
+    if (!homeBtn || !settingsBtn || !panel) return;
+
+    function markActiveSwatch(themeColor) {
+      for (const swatch of swatches) {
+        swatch.classList.toggle("active", swatch.dataset.themeColor === themeColor);
+      }
+    }
+
+    function applyThemeColor(themeColor) {
+      if (themeColor === "warm") delete document.documentElement.dataset.themeColor;
+      else document.documentElement.dataset.themeColor = themeColor;
+      markActiveSwatch(themeColor);
+    }
+
+    applyThemeColor(localStorage.getItem(THEME_COLOR_KEY) || "warm");
+
+    settingsBtn.addEventListener("click", () => {
+      panel.hidden = !panel.hidden;
+      settingsBtn.setAttribute("aria-expanded", String(!panel.hidden));
+    });
+
+    homeBtn.addEventListener("click", () => {
+      panel.hidden = true;
+      settingsBtn.setAttribute("aria-expanded", "false");
+      document.querySelector(".page-a")?.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    for (const swatch of swatches) {
+      swatch.addEventListener("click", () => {
+        const themeColor = swatch.dataset.themeColor;
+        localStorage.setItem(THEME_COLOR_KEY, themeColor);
+        applyThemeColor(themeColor);
+      });
+    }
+  }
+
+  setupSettingsPanel();
+
   const config = window.SUPABASE_CONFIG;
 
   if (!config || !config.url || !config.anonKey || config.url.includes("DEIN-PROJEKT")) {

@@ -25,6 +25,84 @@
   }
 }
 
+/* Selectable color themes for the main list (page A only — the "Rewe
+   zweite Wahl" page keeps its own fixed red theme regardless). Applied via
+   [data-theme-color] on <html>; "warm" is simply the default above. */
+:root[data-theme-color="ocean"] {
+  --bg: #eaf3f5;
+  --card: #e3eff1;
+  --card-alt: #c9dfe4;
+  --text: #233b3f;
+  --muted: #6f8b90;
+  --accent: #2f7d8f;
+  --border: #bcd8dc;
+  --important-bg: #d7e9ec;
+  --important-border: #7fb3bd;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="ocean"] {
+    --bg: #101c1e;
+    --card: #16262a;
+    --card-alt: #1f363b;
+    --text: #dcebee;
+    --muted: #8fa8ac;
+    --accent: #5bb0c2;
+    --border: #2a4247;
+    --important-bg: #1c3236;
+    --important-border: #3f6b73;
+  }
+}
+
+:root[data-theme-color="forest"] {
+  --bg: #eef3ea;
+  --card: #e6efe0;
+  --card-alt: #cfe0c2;
+  --text: #293b22;
+  --muted: #7c8f70;
+  --accent: #4f7a3b;
+  --border: #c8dab8;
+  --important-bg: #dde9d2;
+  --important-border: #8fb377;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="forest"] {
+    --bg: #141c10;
+    --card: #1c2818;
+    --card-alt: #263820;
+    --text: #e2ecd9;
+    --muted: #93a687;
+    --accent: #7bb35d;
+    --border: #31431f;
+    --important-bg: #223018;
+    --important-border: #4f6b38;
+  }
+}
+
+:root[data-theme-color="berry"] {
+  --bg: #f5eef3;
+  --card: #f0e3ec;
+  --card-alt: #e0c3d6;
+  --text: #3b2233;
+  --muted: #8f7086;
+  --accent: #8a3f74;
+  --border: #dcb8ce;
+  --important-bg: #ecd2e2;
+  --important-border: #c17aab;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="berry"] {
+    --bg: #1c1019;
+    --card: #281820;
+    --card-alt: #38202f;
+    --text: #ecdae5;
+    --muted: #a6879e;
+    --accent: #c25fa3;
+    --border: #432a3a;
+    --important-bg: #361f2c;
+    --important-border: #73415f;
+  }
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -515,4 +593,82 @@ ul.items li .delete-btn {
 #toast.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.settings-toolbar {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.icon-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.settings-panel {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.settings-panel-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.theme-swatches {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.theme-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.theme-swatch.active {
+  border-color: var(--text);
+}
+
+.theme-swatch[data-theme-color="warm"] {
+  background: linear-gradient(135deg, #8a5a35, #ecd9c4);
+}
+
+.theme-swatch[data-theme-color="ocean"] {
+  background: linear-gradient(135deg, #2f7d8f, #d7e9ec);
+}
+
+.theme-swatch[data-theme-color="forest"] {
+  background: linear-gradient(135deg, #4f7a3b, #dde9d2);
+}
+
+.theme-swatch[data-theme-color="berry"] {
+  background: linear-gradient(135deg, #8a3f74, #ecd2e2);
 }

@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.18.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.19.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -260,6 +260,39 @@ function check(name, ok, detail) {
   check("Fehler-Toast informiert über den dauerhaften Schreibfehler",
     /Konnte Status nicht/i.test(failToast || ""), "toast=" + failToast);
   await page.evaluate(() => { window.__store.__failUpdatesRemaining = 0; });
+
+  // 19. settings gear opens the color panel; picking a theme applies and
+  // persists it; the home button closes the panel again.
+  const panelHiddenInitially = await page.getAttribute("#settings-panel", "hidden");
+  check("Optionen-Panel ist initial geschlossen", panelHiddenInitially !== null);
+
+  await page.click("#settings-btn");
+  const panelOpen = await page.getAttribute("#settings-panel", "hidden");
+  const expandedAttr = await page.getAttribute("#settings-btn", "aria-expanded");
+  check("Zahnrad öffnet das Optionen-Panel", panelOpen === null && expandedAttr === "true");
+
+  await page.click('.theme-swatch[data-theme-color="ocean"]');
+  const themeAttr = await page.evaluate(() => document.documentElement.dataset.themeColor);
+  const persisted = await page.evaluate(() => localStorage.getItem("einkaufsliste:themeColor"));
+  const activeSwatchLabel = await page.$eval(".theme-swatch.active", (el) => el.dataset.themeColor);
+  check("Farbwahl wird angewendet und gespeichert",
+    themeAttr === "ocean" && persisted === "ocean" && activeSwatchLabel === "ocean",
+    `attr=${themeAttr} stored=${persisted} active=${activeSwatchLabel}`);
+
+  const pageBAccentUnaffected = await page.$eval(".page-b", (el) => getComputedStyle(el).getPropertyValue("--accent").trim());
+  check("Die zweite Liste behält ihr eigenes Farbschema", pageBAccentUnaffected === "#b25a45", "accent=" + pageBAccentUnaffected);
+
+  await page.click("#home-btn");
+  const panelClosedAfterHome = await page.getAttribute("#settings-panel", "hidden");
+  const expandedAfterHome = await page.getAttribute("#settings-btn", "aria-expanded");
+  check("Haus schließt das Panel wieder", panelClosedAfterHome !== null && expandedAfterHome === "false");
+
+  // Selecting "warm" clears the override back to the default palette.
+  await page.click("#settings-btn");
+  await page.click('.theme-swatch[data-theme-color="warm"]');
+  const clearedAttr = await page.evaluate(() => document.documentElement.dataset.themeColor);
+  check("Zurück zu 'Warm' entfernt das Theme-Attribut wieder", clearedAttr === undefined, "attr=" + clearedAttr);
+  await page.click("#home-btn");
 
   // 12. no runtime errors, no alerts (blocked CDN requests are expected)
   const appLog = await page.evaluate(() => window.__log);
