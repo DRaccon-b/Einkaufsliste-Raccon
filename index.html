@@ -7,52 +7,99 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#f3ece0" />
     <title>Einkaufsliste</title>
-    <link rel="stylesheet" href="style.css?v=1.11.0" />
+    <link rel="stylesheet" href="style.css?v=1.12.0" />
   </head>
   <body>
-    <main>
-      <div class="title-row">
-        <h1>🦝🐭 Einkaufsliste</h1>
-        <div class="version-tag">v1.11.0</div>
-      </div>
+    <div class="pager" id="pager">
+      <section class="page page-a" data-suffix="">
+        <div class="page-inner">
+          <div class="title-row">
+            <h1>🦝🐭 Einkaufsliste</h1>
+            <div class="version-tag">v1.12.0</div>
+          </div>
 
-      <form class="add-item" id="add-item-form" hidden>
-        <input id="item-text" type="text" placeholder="z.B. Milch" autocomplete="off" required />
-        <input id="item-category" type="text" placeholder="Kategorie" autocomplete="off" list="category-list" />
-        <datalist id="category-list"></datalist>
-        <button type="submit">+</button>
-      </form>
+          <form class="add-item" id="add-item-form" hidden>
+            <input id="item-text" type="text" placeholder="z.B. Milch" autocomplete="off" required />
+            <input id="item-category" type="text" placeholder="Kategorie" autocomplete="off" list="category-list" />
+            <datalist id="category-list"></datalist>
+            <button type="submit">+</button>
+          </form>
 
-      <div class="search-row" id="search-row" hidden>
-        <input id="search-input" type="search" placeholder="Suchen…" autocomplete="off" />
-      </div>
+          <div class="search-row" id="search-row" hidden>
+            <input id="search-input" type="search" placeholder="Suchen…" autocomplete="off" />
+          </div>
 
-      <label class="filter-row" id="filter-row" hidden>
-        <input type="checkbox" id="hide-checked-filter" />
-        Nur unerledigte anzeigen
-      </label>
+          <label class="filter-row" id="filter-row" hidden>
+            <input type="checkbox" id="hide-checked-filter" />
+            Nur unerledigte anzeigen
+          </label>
 
-      <div id="categories"></div>
-      <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
-      <div class="empty" id="loading-state">Lade…</div>
+          <div id="categories"></div>
+          <div class="empty" id="empty-state" hidden>Noch nichts auf der Liste.</div>
+          <div class="empty" id="loading-state">Lade…</div>
 
-      <div class="bulk-actions" id="bulk-actions" hidden>
-        <button id="check-all-btn" class="secondary">Alles abhaken</button>
-        <button id="uncheck-all-btn" class="secondary">Alles zurücksetzen</button>
-      </div>
+          <div class="bulk-actions" id="bulk-actions" hidden>
+            <button id="check-all-btn" class="secondary">Alles abhaken</button>
+            <button id="uncheck-all-btn" class="secondary">Alles zurücksetzen</button>
+          </div>
 
-      <div class="card" id="share-card" hidden>
-        <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
-        <div class="share-row">
-          <input id="share-link" type="text" readonly />
-          <button id="copy-link" class="secondary">Kopieren</button>
+          <div class="page-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+          </div>
+
+          <div class="card" id="share-card" hidden>
+            <div class="hint">Diesen Link teilen, damit andere dieselbe Liste sehen:</div>
+            <div class="share-row">
+              <input id="share-link" type="text" readonly />
+              <button id="copy-link" class="secondary">Kopieren</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </main>
+      </section>
 
-    <script src="config.js?v=1.11.0"></script>
+      <section class="page page-b" data-suffix="-b">
+        <div class="page-inner">
+          <div class="title-row">
+            <h1>🍅 Zweite Liste</h1>
+          </div>
+
+          <form class="add-item" id="add-item-form-b" hidden>
+            <input id="item-text-b" type="text" placeholder="z.B. Milch" autocomplete="off" required />
+            <input id="item-category-b" type="text" placeholder="Kategorie" autocomplete="off" list="category-list-b" />
+            <datalist id="category-list-b"></datalist>
+            <button type="submit">+</button>
+          </form>
+
+          <div class="search-row" id="search-row-b" hidden>
+            <input id="search-input-b" type="search" placeholder="Suchen…" autocomplete="off" />
+          </div>
+
+          <label class="filter-row" id="filter-row-b" hidden>
+            <input type="checkbox" id="hide-checked-filter-b" />
+            Nur unerledigte anzeigen
+          </label>
+
+          <div id="categories-b"></div>
+          <div class="empty" id="empty-state-b" hidden>Noch nichts auf der Liste.</div>
+          <div class="empty" id="loading-state-b">Lade…</div>
+
+          <div class="bulk-actions" id="bulk-actions-b" hidden>
+            <button id="check-all-btn-b" class="secondary">Alles abhaken</button>
+            <button id="uncheck-all-btn-b" class="secondary">Alles zurücksetzen</button>
+          </div>
+
+          <div class="page-dots">
+            <span class="dot"></span>
+            <span class="dot active"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="config.js?v=1.12.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-    <script src="app.js?v=1.11.0"></script>
+    <script src="app.js?v=1.12.0"></script>
   </body>
 </html>

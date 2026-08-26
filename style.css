@@ -40,24 +40,88 @@ html {
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   min-height: -webkit-fill-available;
-  display: flex;
-  justify-content: center;
-  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
   overflow-x: hidden;
   max-width: 100vw;
 }
 
-main {
+.pager {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.page {
+  min-width: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  justify-content: center;
+  background: var(--bg);
+  overflow-y: auto;
+  padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.page-b {
+  --bg: #f8ece9;
+  --card: #f5e2dd;
+  --card-alt: #eeccc2;
+  --text: #3d2622;
+  --muted: #a1837c;
+  --accent: #b25a45;
+  --border: #e6c6bc;
+  --important-bg: #f3d3c8;
+  --important-border: #d99e8d;
+  --star: #9c3f2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .page-b {
+    --bg: #201513;
+    --card: #2d1c19;
+    --card-alt: #3e2420;
+    --text: #f0ddd8;
+    --muted: #b0938c;
+    --accent: #d98066;
+    --border: #4a2b25;
+    --important-bg: #422620;
+    --important-border: #7a4032;
+    --star: #e08a6b;
+  }
+}
+
+.page-inner {
   width: 100%;
   max-width: 480px;
   min-width: 0;
+}
+
+.page-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.page-dots .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.page-dots .dot.active {
+  background: var(--accent);
 }
 
 .title-row {

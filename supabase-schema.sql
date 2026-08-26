@@ -6,6 +6,8 @@ create table if not exists shopping_lists (
   created_at timestamptz not null default now()
 );
 
+alter table shopping_lists add column if not exists secondary_list_id uuid references shopping_lists(id);
+
 create table if not exists shopping_items (
   id uuid primary key default gen_random_uuid(),
   list_id uuid not null references shopping_lists(id) on delete cascade,
