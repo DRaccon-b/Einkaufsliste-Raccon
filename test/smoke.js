@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.21.1", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.21.2", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -123,6 +123,21 @@ function check(name, ok, detail) {
   await page.waitForTimeout(500);
   const a3gone = await page.evaluate(() => !window.__store.shopping_items.some((i) => i.id === "a3"));
   check("Löschen entfernt den Artikel", a3gone);
+
+  // Focusing a quantity field with an existing value must select it all, so
+  // typing immediately replaces it instead of appending to/behind it.
+  await page.focus('#categories li[data-id="a1"] .quantity-input');
+  const quantitySelection = await page.$eval('#categories li[data-id="a1"] .quantity-input', (el) => ({
+    value: el.value,
+    selected: el.value.slice(el.selectionStart, el.selectionEnd),
+  }));
+  check("Mengenfeld markiert seinen Inhalt beim Fokussieren komplett",
+    quantitySelection.selected === quantitySelection.value && quantitySelection.value.length > 0,
+    JSON.stringify(quantitySelection));
+  await page.keyboard.type("5");
+  const quantityAfterType = await page.$eval('#categories li[data-id="a1"] .quantity-input', (el) => el.value);
+  check("Eintippen ersetzt den markierten Wert statt ihn zu ergänzen", quantityAfterType === "5", "value=" + quantityAfterType);
+  await page.$eval('#categories li[data-id="a1"] .quantity-input', (el) => el.blur());
 
   // 11. rapid repeated toggling must settle correctly and coalesce into one write
   await page.evaluate(() => (window.__log.writes.length = 0));

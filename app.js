@@ -259,6 +259,10 @@
         updateItemFields(current.id, { text: newText });
       });
 
+      quantityInput.addEventListener("focus", () => {
+        quantityInput.select();
+      });
+
       quantityInput.addEventListener("change", () => {
         const current = li._item;
         current.quantity = quantityInput.value.trim() || null;
