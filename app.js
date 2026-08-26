@@ -13,8 +13,6 @@
     return document.getElementById(id);
   }
 
-  function debugLog() {}
-
   // Shared across both list controllers so an optimistic change made via a
   // mirrored item (owned by the other list) still protects that item's own
   // controller from a stale/delayed realtime read overwriting it.
@@ -161,7 +159,6 @@
 
       checkbox.addEventListener("change", () => {
         const current = li._item;
-        debugLog(`[${suffix || "A"}] CHANGE event: "${current.text}" -> ${checkbox.checked}`);
         current.checked = checkbox.checked;
         if (li._isMirror && checkbox.checked) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
@@ -257,8 +254,6 @@
     }
 
     function render() {
-      const obstNow = allItems.find((i) => i.text === "Obst");
-      if (obstNow) debugLog(`[${suffix || "A"}] render() called, Obst.checked=${obstNow.checked}`);
       const query = searchInput.value.trim().toLowerCase();
       let filtered = query ? allItems.filter((item) => item.text.toLowerCase().includes(query)) : allItems;
 
@@ -406,16 +401,12 @@
     function applyOverrides(data) {
       for (const item of data) {
         const overrides = localOverrides.get(item.id);
-        if (overrides) {
-          debugLog(`[${suffix || "A"}] OVERRIDE applied to "${item.text}": ${JSON.stringify(overrides)} (server had checked=${item.checked})`);
-          Object.assign(item, overrides);
-        }
+        if (overrides) Object.assign(item, overrides);
       }
       return data;
     }
 
     async function loadItems() {
-      debugLog(`[${suffix || "A"}] loadItems() fetching...`);
       const { data, error } = await supabase
         .from("shopping_items")
         .select("*")
@@ -430,8 +421,6 @@
         return;
       }
 
-      const obst = data.find((i) => i.text === "Obst");
-      if (obst) debugLog(`[${suffix || "A"}] loadItems() got Obst checked=${obst.checked}`);
       loadingState.hidden = true;
       renderItems(applyOverrides(data));
     }
@@ -463,12 +452,20 @@
       if (error) alert("Konnte Artikel nicht hinzufügen: " + error.message);
     }
 
+    // Clears just the given fields from an item's override once they're safely
+    // confirmed, leaving any other still-pending overrides for that item intact.
+    function clearOverrideFields(itemId, fields) {
+      const current = localOverrides.get(itemId);
+      if (!current) return;
+      for (const field of Object.keys(fields)) delete current[field];
+      if (Object.keys(current).length === 0) localOverrides.delete(itemId);
+    }
+
     function writeFieldsDebounced(itemId, fields, errorMessage) {
       const key = itemId + ":" + Object.keys(fields).sort().join(",");
       localOverrides.set(itemId, { ...(localOverrides.get(itemId) || {}), ...fields });
-      debugLog(`[${suffix || "A"}] writeFieldsDebounced scheduled: ${JSON.stringify(fields)} for item ${itemId.slice(0, 8)}`);
 
-      const clearKey = itemId + ":" + Object.keys(fields).sort().join(",") + ":clear";
+      const clearKey = key + ":clear";
       const existingClear = overrideClearTimers.get(clearKey);
       if (existingClear) clearTimeout(existingClear);
 
@@ -476,20 +473,14 @@
       if (existing) clearTimeout(existing);
       const timer = setTimeout(async () => {
         pendingWrites.delete(key);
-        debugLog(`[${suffix || "A"}] WRITE sending: ${JSON.stringify(fields)} for item ${itemId.slice(0, 8)}`);
         const { error } = await supabase.from("shopping_items").update(fields).eq("id", itemId);
-        debugLog(`[${suffix || "A"}] WRITE done: ${JSON.stringify(fields)} error=${error ? error.message : "none"}`);
-        if (error) {
-          alert(errorMessage + error.message);
-        }
+        if (error) alert(errorMessage + error.message);
+
+        // Keep the override in place a little longer after the write completes,
+        // so a delayed/out-of-order realtime read can't briefly show stale data.
         const clearTimer = setTimeout(() => {
-          debugLog(`[${suffix || "A"}] override CLEARED for item ${itemId.slice(0, 8)}: ${JSON.stringify(fields)}`);
           overrideClearTimers.delete(clearKey);
-          const current = localOverrides.get(itemId);
-          if (current) {
-            for (const field of Object.keys(fields)) delete current[field];
-            if (Object.keys(current).length === 0) localOverrides.delete(itemId);
-          }
+          clearOverrideFields(itemId, fields);
         }, 4000);
         overrideClearTimers.set(clearKey, clearTimer);
       }, 250);
@@ -517,13 +508,7 @@
       for (const item of allItems) localOverrides.set(item.id, { ...(localOverrides.get(item.id) || {}), checked });
       const { error } = await supabase.from("shopping_items").update({ checked }).eq("list_id", listId);
       if (error) alert("Konnte Liste nicht aktualisieren: " + error.message);
-      for (const item of allItems) {
-        const current = localOverrides.get(item.id);
-        if (current) {
-          delete current.checked;
-          if (Object.keys(current).length === 0) localOverrides.delete(item.id);
-        }
-      }
+      for (const item of allItems) clearOverrideFields(item.id, { checked });
     }
 
     function subscribeToChanges() {
@@ -532,10 +517,7 @@
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${listId}` },
-          (payload) => {
-            debugLog(`[${suffix || "A"}] REALTIME own event: ${payload.eventType} on "${payload.new?.text || payload.old?.text}" checked=${payload.new?.checked}`);
-            loadItems();
-          }
+          () => loadItems()
         )
         .subscribe();
 
@@ -545,10 +527,7 @@
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "shopping_items", filter: `list_id=eq.${mirror.listId}` },
-            (payload) => {
-              debugLog(`[${suffix || "A"}] REALTIME mirror event: ${payload.eventType} on "${payload.new?.text || payload.old?.text}" checked=${payload.new?.checked}`);
-              loadMirrorItems();
-            }
+            () => loadMirrorItems()
           )
           .subscribe();
       }
