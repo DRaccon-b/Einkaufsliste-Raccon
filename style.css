@@ -25,9 +25,11 @@
   }
 }
 
-/* Selectable color themes for the main list (page A only — the "Rewe
-   zweite Wahl" page keeps its own fixed red theme regardless). Applied via
-   [data-theme-color] on <html>; "warm" is simply the default above. */
+/* Selectable color themes, applied via [data-theme-color] on <html>.
+   "warm" is simply the default :root/.page-b above. Each theme also
+   recolors the second list ("Rewe zweite Wahl") to a matching but distinct
+   palette, via the ":root[...] .page-b" overrides further below — higher
+   specificity than the base ".page-b" rule, so it wins. */
 :root[data-theme-color="ocean"] {
   --bg: #eaf3f5;
   --card: #e3eff1;
@@ -50,6 +52,30 @@
     --border: #2a4247;
     --important-bg: #1c3236;
     --important-border: #3f6b73;
+  }
+}
+:root[data-theme-color="ocean"] .page-b {
+  --bg: #fdf0ec;
+  --card: #fbe4dc;
+  --card-alt: #f3c5b4;
+  --text: #4a2b21;
+  --muted: #a98577;
+  --accent: #d97456;
+  --border: #f0cabb;
+  --important-bg: #f8d9cb;
+  --important-border: #e3a48c;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="ocean"] .page-b {
+    --bg: #22140f;
+    --card: #301c15;
+    --card-alt: #432819;
+    --text: #f5ddd2;
+    --muted: #bb9484;
+    --accent: #e88a68;
+    --border: #4f2e21;
+    --important-bg: #452a1e;
+    --important-border: #824a35;
   }
 }
 
@@ -77,6 +103,30 @@
     --important-border: #4f6b38;
   }
 }
+:root[data-theme-color="forest"] .page-b {
+  --bg: #fbf2e3;
+  --card: #f8ead2;
+  --card-alt: #efd19f;
+  --text: #4a3313;
+  --muted: #a68a5c;
+  --accent: #b8792c;
+  --border: #e9cd9c;
+  --important-bg: #f4e0b8;
+  --important-border: #d3a35c;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="forest"] .page-b {
+    --bg: #211708;
+    --card: #2f210c;
+    --card-alt: #453113;
+    --text: #f2e2c4;
+    --muted: #bda07a;
+    --accent: #d99a45;
+    --border: #4f3a17;
+    --important-bg: #463117;
+    --important-border: #8a642c;
+  }
+}
 
 :root[data-theme-color="berry"] {
   --bg: #f5eef3;
@@ -100,6 +150,30 @@
     --border: #432a3a;
     --important-bg: #361f2c;
     --important-border: #73415f;
+  }
+}
+:root[data-theme-color="berry"] .page-b {
+  --bg: #eaf6f2;
+  --card: #e1f0e9;
+  --card-alt: #bfe0d1;
+  --text: #1f3d33;
+  --muted: #6e968a;
+  --accent: #2e8f74;
+  --border: #b7d9cb;
+  --important-bg: #d3ece2;
+  --important-border: #6fb79c;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme-color="berry"] .page-b {
+    --bg: #0f1e19;
+    --card: #152a23;
+    --card-alt: #1e3c32;
+    --text: #dcf0e8;
+    --muted: #8ab0a2;
+    --accent: #4fbf9d;
+    --border: #2b473c;
+    --important-bg: #1c342b;
+    --important-border: #3f7d65;
   }
 }
 
@@ -630,45 +704,99 @@ ul.items li .delete-btn {
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--muted);
-  margin-bottom: 12px;
+  margin-bottom: 2px;
   text-align: center;
+}
+
+.settings-panel-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  opacity: 0.75;
+  text-align: center;
+  margin-bottom: 14px;
 }
 
 .theme-swatches {
   display: flex;
   justify-content: center;
-  gap: 14px;
+  gap: 20px;
 }
 
 .theme-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 2px;
   min-width: 0;
   min-height: 0;
   cursor: pointer;
   touch-action: manipulation;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
-.theme-swatch.active {
+.theme-swatch-dot {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-swatch-dot::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.theme-swatch-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.theme-swatch.active .theme-swatch-dot {
   border-color: var(--text);
+  transform: scale(1.1);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
-.theme-swatch[data-theme-color="warm"] {
-  background: linear-gradient(135deg, #8a5a35, #ecd9c4);
+.theme-swatch.active .theme-swatch-dot::after {
+  opacity: 1;
+  transform: scale(1);
 }
 
-.theme-swatch[data-theme-color="ocean"] {
-  background: linear-gradient(135deg, #2f7d8f, #d7e9ec);
+.theme-swatch.active .theme-swatch-label {
+  color: var(--text);
 }
 
-.theme-swatch[data-theme-color="forest"] {
-  background: linear-gradient(135deg, #4f7a3b, #dde9d2);
+/* Each dot is split diagonally: the main list's accent on top, the
+   second list's on the bottom, so both colors are visible at a glance. */
+.theme-swatch[data-theme-color="warm"] .theme-swatch-dot {
+  background: linear-gradient(135deg, #8a5a35 50%, #b25a45 50%);
 }
 
-.theme-swatch[data-theme-color="berry"] {
-  background: linear-gradient(135deg, #8a3f74, #ecd2e2);
+.theme-swatch[data-theme-color="ocean"] .theme-swatch-dot {
+  background: linear-gradient(135deg, #2f7d8f 50%, #d97456 50%);
+}
+
+.theme-swatch[data-theme-color="forest"] .theme-swatch-dot {
+  background: linear-gradient(135deg, #4f7a3b 50%, #b8792c 50%);
+}
+
+.theme-swatch[data-theme-color="berry"] .theme-swatch-dot {
+  background: linear-gradient(135deg, #8a3f74 50%, #2e8f74 50%);
 }

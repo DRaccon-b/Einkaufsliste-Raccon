@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#f3ece0" />
     <title>Einkaufsliste</title>
-    <link rel="stylesheet" href="style.css?v=1.19.1" />
+    <link rel="stylesheet" href="style.css?v=1.20.0" />
   </head>
   <body>
     <div class="pager" id="pager">
@@ -15,7 +15,7 @@
         <div class="page-inner">
           <div class="title-row">
             <h1>🦝🐭 Einkaufsliste</h1>
-            <div class="version-tag">v1.19.1</div>
+            <div class="version-tag">v1.20.0</div>
           </div>
 
           <form class="add-item" id="add-item-form" hidden>
@@ -72,11 +72,24 @@
 
           <div class="settings-panel" id="settings-panel" hidden>
             <div class="settings-panel-title">Farbe</div>
+            <div class="settings-panel-hint">Färbt beide Listen passend ein</div>
             <div class="theme-swatches">
-              <button type="button" class="theme-swatch" data-theme-color="warm" aria-label="Warm (Standard)"></button>
-              <button type="button" class="theme-swatch" data-theme-color="ocean" aria-label="Ozean"></button>
-              <button type="button" class="theme-swatch" data-theme-color="forest" aria-label="Wald"></button>
-              <button type="button" class="theme-swatch" data-theme-color="berry" aria-label="Beere"></button>
+              <button type="button" class="theme-swatch" data-theme-color="warm" aria-label="Warm (Standard)">
+                <span class="theme-swatch-dot"></span>
+                <span class="theme-swatch-label">Warm</span>
+              </button>
+              <button type="button" class="theme-swatch" data-theme-color="ocean" aria-label="Ozean">
+                <span class="theme-swatch-dot"></span>
+                <span class="theme-swatch-label">Ozean</span>
+              </button>
+              <button type="button" class="theme-swatch" data-theme-color="forest" aria-label="Wald">
+                <span class="theme-swatch-dot"></span>
+                <span class="theme-swatch-label">Wald</span>
+              </button>
+              <button type="button" class="theme-swatch" data-theme-color="berry" aria-label="Beere">
+                <span class="theme-swatch-dot"></span>
+                <span class="theme-swatch-label">Beere</span>
+              </button>
             </div>
           </div>
         </div>
@@ -121,9 +134,9 @@
       </section>
     </div>
 
-    <script src="config.js?v=1.19.1"></script>
+    <script src="config.js?v=1.20.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-    <script src="app.js?v=1.19.1"></script>
+    <script src="app.js?v=1.20.0"></script>
   </body>
 </html>

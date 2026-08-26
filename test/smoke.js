@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.19.1", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.20.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -307,19 +307,30 @@ function check(name, ok, detail) {
     themeAttr === "ocean" && persisted === "ocean" && activeSwatchLabel === "ocean",
     `attr=${themeAttr} stored=${persisted} active=${activeSwatchLabel}`);
 
-  const pageBAccentUnaffected = await page.$eval(".page-b", (el) => getComputedStyle(el).getPropertyValue("--accent").trim());
-  check("Die zweite Liste behält ihr eigenes Farbschema", pageBAccentUnaffected === "#b25a45", "accent=" + pageBAccentUnaffected);
+  // Each theme recolors both lists with a matching but distinct palette —
+  // list B must actually change, and to a different color than list A.
+  const [pageAAccent, pageBAccent] = await page.evaluate(() => [
+    getComputedStyle(document.querySelector(".page-a")).getPropertyValue("--accent").trim(),
+    getComputedStyle(document.querySelector(".page-b")).getPropertyValue("--accent").trim(),
+  ]);
+  check("Die zweite Liste bekommt beim Theme-Wechsel eine eigene, passende Farbe",
+    pageBAccent !== "#b25a45" && pageBAccent !== pageAAccent,
+    `A=${pageAAccent} B=${pageBAccent}`);
 
   await page.click("#home-btn");
   const panelClosedAfterHome = await page.getAttribute("#settings-panel", "hidden");
   const expandedAfterHome = await page.getAttribute("#settings-btn", "aria-expanded");
   check("Haus schließt das Panel wieder", panelClosedAfterHome !== null && expandedAfterHome === "false");
 
-  // Selecting "warm" clears the override back to the default palette.
+  // Selecting "warm" clears the override back to the default palette, and
+  // list B goes back to its original red exactly.
   await page.click("#settings-btn");
   await page.click('.theme-swatch[data-theme-color="warm"]');
   const clearedAttr = await page.evaluate(() => document.documentElement.dataset.themeColor);
   check("Zurück zu 'Warm' entfernt das Theme-Attribut wieder", clearedAttr === undefined, "attr=" + clearedAttr);
+  const pageBAccentAfterWarm = await page.$eval(".page-b", (el) => getComputedStyle(el).getPropertyValue("--accent").trim());
+  check("'Warm' stellt das ursprüngliche Rot der zweiten Liste wieder her",
+    pageBAccentAfterWarm === "#b25a45", "accent=" + pageBAccentAfterWarm);
   await page.click("#home-btn");
 
   // 12. no runtime errors, no alerts (blocked CDN requests are expected)
