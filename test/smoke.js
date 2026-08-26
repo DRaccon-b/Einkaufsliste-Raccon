@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.21.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.21.1", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -170,6 +170,21 @@ function check(name, ok, detail) {
   check("Nach dem Settle steht der Artikel genau einmal da (kein Duplikat)",
     occurrences === 1, JSON.stringify(afterSettle));
   await page.evaluate(() => { window.__store.__insertDelayMs = 0; });
+
+  // The stored position must be a real Postgres `integer` value — a prior
+  // release used Date.now() (13 digits) as the position for new items,
+  // which is always out of range for a 32-bit integer column and made
+  // every single add fail against the real database in production,
+  // undetected here because the stub didn't enforce the column type.
+  const addedPosition = await page.evaluate(() =>
+    window.__store.shopping_items.find((i) => i.text === "Optimistisch")?.position
+  );
+  check("Neuer Artikel bekommt eine gültige Postgres-Integer-Position",
+    typeof addedPosition === "number" && addedPosition <= 2147483647, "position=" + addedPosition);
+  // #toast is only created on the first notify() call, so it may not exist
+  // in the DOM at all yet — that itself means "no error", which is fine.
+  const addToast = await page.evaluate(() => document.getElementById("toast")?.textContent || "");
+  check("Kein Fehler-Toast beim Hinzufügen", !/nicht hinzufügen/i.test(addToast), "toast=" + addToast);
 
   // 14. picking an existing category from the dropdown fills the field
   // without typing, and choosing "+ Neue Kategorie…" reveals a text input

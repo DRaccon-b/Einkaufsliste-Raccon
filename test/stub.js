@@ -55,6 +55,23 @@ window.confirm = () => true;
       return b._filters.every(([c, v]) => row[c] === v);
     }
 
+    // shopping_items.position/category_order are Postgres `integer` (32-bit)
+    // columns — mirror that constraint so a value like Date.now() (13
+    // digits) fails here exactly like it would against the real database,
+    // instead of silently "working" against this in-memory stub.
+    const PG_INT4_MAX = 2147483647;
+    const PG_INT4_MIN = -2147483648;
+    function pgIntegerRangeError(payload) {
+      if (table !== "shopping_items") return null;
+      for (const field of ["position", "category_order"]) {
+        const value = payload[field];
+        if (typeof value === "number" && (value > PG_INT4_MAX || value < PG_INT4_MIN)) {
+          return { message: `value "${value}" is out of range for type integer` };
+        }
+      }
+      return null;
+    }
+
     async function run() {
       const rows = store[table];
       if (b._op === "select") {
@@ -62,6 +79,8 @@ window.confirm = () => true;
         return { data: b._single ? found[0] || null : found, error: null };
       }
       if (b._op === "insert") {
+        const rangeError = pgIntegerRangeError(b._payload);
+        if (rangeError) return { data: null, error: rangeError };
         // Tests can set window.__store.__insertDelayMs to simulate a slow
         // network and verify the app doesn't just sit there waiting.
         if (store.__insertDelayMs) await new Promise((r) => setTimeout(r, store.__insertDelayMs));
@@ -71,6 +90,8 @@ window.confirm = () => true;
         return { data: b._single ? { ...row } : [{ ...row }], error: null };
       }
       if (b._op === "update") {
+        const rangeError = pgIntegerRangeError(b._payload);
+        if (rangeError) return { data: null, error: rangeError };
         // Tests can set window.__store.__failUpdatesRemaining to simulate a
         // flaky backend without mutating any data, to exercise retry/revert.
         if (store.__failUpdatesRemaining > 0) {

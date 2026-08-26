@@ -638,6 +638,17 @@
       render();
     }
 
+    // "position" is a Postgres integer column (max ~2.1 billion) — Date.now()
+    // overflows it after a handful of digits, so new items instead go past
+    // whatever the highest position currently in use is.
+    function nextPosition() {
+      let max = 0;
+      for (const item of allItems) {
+        if (typeof item.position === "number" && item.position > max) max = item.position;
+      }
+      return max + 1;
+    }
+
     async function addItem(text, category) {
       // Show the new item immediately instead of waiting for a full
       // round-trip; applyRealtimeEvent() reconciles it with the server-
@@ -649,7 +660,7 @@
         list_id: listId,
         category: category || "Sonstiges",
         category_order: null,
-        position: Date.now(),
+        position: nextPosition(),
         text,
         quantity: null,
         unit: null,
