@@ -146,10 +146,6 @@
           .join(" ");
         li.dataset.id = item.id;
 
-        const dragHandle = document.createElement("span");
-        dragHandle.className = "drag-handle";
-        dragHandle.textContent = "⠿";
-
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
         checkbox.checked = item.checked;
@@ -209,7 +205,7 @@
           deleteItem(item.id);
         });
 
-        li.append(dragHandle, checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
+        li.append(checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
         ul.appendChild(li);
       }
 
@@ -218,8 +214,11 @@
 
       if (!query && !hideCheckedFilter.checked && window.Sortable) {
         const instance = window.Sortable.create(ul, {
-          handle: ".drag-handle",
           animation: 150,
+          delay: 120,
+          delayOnTouchOnly: true,
+          filter: "input, select, button",
+          preventOnFilter: false,
           onEnd: () => persistOrder(category, [...ul.children].map((li) => li.dataset.id)),
         });
         sortableInstances.push(instance);

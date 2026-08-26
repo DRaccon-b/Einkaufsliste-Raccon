@@ -310,20 +310,6 @@ ul.items li.important.checked {
   opacity: 0.7;
 }
 
-ul.items li .drag-handle {
-  color: var(--muted);
-  font-size: 1rem;
-  padding: 0;
-  width: 20px;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  cursor: grab;
-  touch-action: none;
-}
-
 ul.items li.sortable-ghost {
   opacity: 0.4;
 }
