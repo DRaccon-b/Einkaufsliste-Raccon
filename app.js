@@ -27,6 +27,10 @@
     settingsBtn.addEventListener("click", () => {
       panel.hidden = !panel.hidden;
       settingsBtn.setAttribute("aria-expanded", String(!panel.hidden));
+      // On a long list the gear can sit far down the page — without this,
+      // the panel can open just below the visible area and look like
+      // nothing happened.
+      if (!panel.hidden) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
 
     homeBtn.addEventListener("click", () => {

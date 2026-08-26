@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.19.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.19.1", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -266,10 +266,38 @@ function check(name, ok, detail) {
   const panelHiddenInitially = await page.getAttribute("#settings-panel", "hidden");
   check("Optionen-Panel ist initial geschlossen", panelHiddenInitially !== null);
 
-  await page.click("#settings-btn");
+  // Reproduce a long real-world list: with many items, the gear sits far
+  // down the page — the panel must scroll into view on open, or opening it
+  // is indistinguishable from nothing happening.
+  await page.evaluate(async () => {
+    for (let i = 0; i < 25; i++) {
+      await window.supabase.createClient().from("shopping_items").insert({
+        id: "filler-" + i, list_id: "LIST-A", category: "Haushalt", category_order: 5,
+        position: 200 + i, text: "Füllartikel " + i, checked: false, important: false, quantity: null, unit: null,
+      });
+    }
+  });
+  await page.waitForTimeout(200);
+  // Scroll exactly as far as a real user would: just enough to bring the
+  // gear button into view, mirroring the reported case (long list, button
+  // reached by scrolling, tap appears to do nothing).
+  await page.$eval(".page-a", (pageEl) => {
+    const btn = document.getElementById("settings-btn");
+    pageEl.scrollTop += btn.getBoundingClientRect().bottom - pageEl.getBoundingClientRect().bottom;
+  });
+  await page.evaluate(() => document.getElementById("settings-btn").click());
+  await page.waitForTimeout(500); // let the smooth scrollIntoView settle
   const panelOpen = await page.getAttribute("#settings-panel", "hidden");
   const expandedAttr = await page.getAttribute("#settings-btn", "aria-expanded");
   check("Zahnrad öffnet das Optionen-Panel", panelOpen === null && expandedAttr === "true");
+
+  const panelInViewport = await page.$eval(".page-a", (pageEl) => {
+    const panel = document.getElementById("settings-panel");
+    const panelRect = panel.getBoundingClientRect();
+    const pageRect = pageEl.getBoundingClientRect();
+    return panelRect.top >= pageRect.top - 1 && panelRect.bottom <= pageRect.bottom + 1;
+  });
+  check("Panel scrollt bei langer Liste automatisch ins Blickfeld", panelInViewport);
 
   await page.click('.theme-swatch[data-theme-color="ocean"]');
   const themeAttr = await page.evaluate(() => document.documentElement.dataset.themeColor);
