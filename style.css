@@ -1,27 +1,29 @@
 :root {
   color-scheme: light dark;
-  --bg: #f5f5f0;
-  --card: #ffffff;
-  --text: #1f2320;
-  --muted: #6b7268;
-  --accent: #3f7d4f;
-  --border: #e2e2dc;
-  --important-bg: #fdecec;
-  --important-border: #e6a6a6;
-  --star: #d1541f;
+  --bg: #f3ece0;
+  --card: #ede2cd;
+  --card-alt: #e4d3b3;
+  --text: #3b3226;
+  --muted: #8a7c66;
+  --accent: #8a5a35;
+  --border: #d9c7a4;
+  --important-bg: #ecd9c4;
+  --important-border: #cfa877;
+  --star: #a8622f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14171a;
-    --card: #1f2327;
-    --text: #eceff0;
-    --muted: #8a938c;
-    --accent: #6bbf7f;
-    --border: #2c3136;
-    --important-bg: #3a2222;
-    --important-border: #6b3838;
-    --star: #ef7b4c;
+    --bg: #1e1812;
+    --card: #2a2119;
+    --card-alt: #34291d;
+    --text: #ece2d2;
+    --muted: #a3927a;
+    --accent: #c99a67;
+    --border: #40331f;
+    --important-bg: #3a2c1c;
+    --important-border: #6b4c26;
+    --star: #d9a15f;
   }
 }
 
@@ -281,6 +283,10 @@ ul.items li {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
+}
+
+ul.items li:nth-child(even):not(.checked):not(.important) {
+  background: var(--card-alt);
 }
 
 ul.items li .item-text {
