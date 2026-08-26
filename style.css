@@ -349,6 +349,7 @@ ul.items li {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
+  transition: opacity 0.25s ease, background-color 0.25s ease;
 }
 
 ul.items li:nth-child(even):not(.important) {

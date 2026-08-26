@@ -13,19 +13,7 @@
     return document.getElementById(id);
   }
 
-  const debugPanel = document.createElement("div");
-  debugPanel.id = "debug-panel";
-  debugPanel.style.cssText =
-    "position:fixed;bottom:0;left:0;right:0;max-height:35vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#0f0;font-family:monospace;font-size:11px;padding:6px;z-index:9999;white-space:pre-wrap;";
-  document.body.appendChild(debugPanel);
-  const debugStart = Date.now();
-  function debugLog(msg) {
-    const line = document.createElement("div");
-    line.textContent = `+${((Date.now() - debugStart) / 1000).toFixed(2)}s ${msg}`;
-    debugPanel.appendChild(line);
-    debugPanel.scrollTop = debugPanel.scrollHeight;
-    while (debugPanel.children.length > 60) debugPanel.removeChild(debugPanel.firstChild);
-  }
+  function debugLog() {}
 
   async function createList() {
     const { data, error } = await supabase.from("shopping_lists").insert({}).select().single();
