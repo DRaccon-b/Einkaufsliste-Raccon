@@ -140,6 +140,11 @@
 
       li.append(checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn);
 
+      for (const el of [checkbox, span, quantityInput, unitSelect, starBtn, deleteBtn]) {
+        el.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: true });
+        el.addEventListener("pointerdown", (e) => e.stopPropagation());
+      }
+
       checkbox.addEventListener("change", () => {
         const current = li._item;
         current.checked = checkbox.checked;
