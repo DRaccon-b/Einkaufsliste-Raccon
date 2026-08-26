@@ -401,6 +401,12 @@
 
     const secondaryListId = await getOrCreateSecondaryListId(primaryListId);
     createListController("-b", secondaryListId, { showShareLink: false });
+
+    const pager = document.getElementById("pager");
+    pager.scrollLeft = 0;
+    window.addEventListener("pageshow", () => {
+      pager.scrollLeft = 0;
+    });
   }
 
   init();
