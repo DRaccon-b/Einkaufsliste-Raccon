@@ -339,6 +339,7 @@ button.secondary {
 
 form.add-item {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
   max-width: 100%;
@@ -354,8 +355,24 @@ form.add-item input {
   min-height: 44px;
 }
 
-form.add-item input#item-category {
+.category-select {
   flex: 0.6;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 16px;
+  font-family: inherit;
+}
+
+form.add-item .category-custom-input {
+  /* Higher specificity than "form.add-item input" (which would otherwise
+     win and force flex:1, preventing this from wrapping to its own row). */
+  flex: 1 1 100%;
+  order: 1;
 }
 
 .search-row {

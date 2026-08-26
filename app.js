@@ -146,7 +146,7 @@
     const addItemForm = el("add-item-form" + suffix);
     const itemTextInput = el("item-text" + suffix);
     const itemCategoryInput = el("item-category" + suffix);
-    const categoryList = el("category-list" + suffix);
+    const itemCategoryCustomInput = el("item-category-custom" + suffix);
     const searchRow = el("search-row" + suffix);
     const searchInput = el("search-input" + suffix);
     const categoriesEl = el("categories" + suffix);
@@ -316,16 +316,44 @@
       }
     }
 
-    function updateCategoryDatalist() {
-      const categoryNames = [...new Set(allItems.map((i) => i.category || "Sonstiges"))];
+    // Populates the category <select> with every category currently in use,
+    // plus a "+ Neue Kategorie…" entry that reveals a free-text input. A
+    // plain <input list="..."> (datalist) doesn't show a dropdown at all on
+    // iOS Safari, so a real <select> is used instead for its native picker.
+    function updateCategorySelectOptions() {
+      const categoryNames = [...new Set(allItems.map((i) => i.category || "Sonstiges"))].sort((a, b) =>
+        a.localeCompare(b, "de")
+      );
       const key = categoryNames.join("\n");
       if (key === renderedCategoryOptions) return;
+      const isFirstPopulate = renderedCategoryOptions === null;
       renderedCategoryOptions = key;
-      categoryList.innerHTML = "";
+
+      const currentValue = itemCategoryInput.value;
+      itemCategoryInput.innerHTML = "";
+
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Kategorie";
+      itemCategoryInput.appendChild(placeholder);
+
       for (const category of categoryNames) {
         const option = document.createElement("option");
         option.value = category;
-        categoryList.appendChild(option);
+        option.textContent = category;
+        itemCategoryInput.appendChild(option);
+      }
+
+      const newCategoryOption = document.createElement("option");
+      newCategoryOption.value = "__new__";
+      newCategoryOption.textContent = "+ Neue Kategorie…";
+      itemCategoryInput.appendChild(newCategoryOption);
+
+      // On the very first populate, restore the last-used category from
+      // localStorage; afterwards, keep whatever the user already picked.
+      const desired = isFirstPopulate ? localStorage.getItem(lastCategoryKey) || "" : currentValue;
+      if ([...itemCategoryInput.options].some((o) => o.value === desired)) {
+        itemCategoryInput.value = desired;
       }
     }
 
@@ -355,7 +383,7 @@
         }
       }
 
-      updateCategoryDatalist();
+      updateCategorySelectOptions();
 
       const collapsedSet = getCollapsedSet();
       const existingDetails = new Map();
@@ -813,18 +841,28 @@
         });
       }
 
-      itemCategoryInput.value = localStorage.getItem(lastCategoryKey) || "";
+      itemCategoryInput.addEventListener("change", () => {
+        const showCustom = itemCategoryInput.value === "__new__";
+        itemCategoryCustomInput.hidden = !showCustom;
+        if (showCustom) itemCategoryCustomInput.focus();
+      });
 
       addItemForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const text = itemTextInput.value.trim();
-        const category = itemCategoryInput.value.trim();
+        const isNewCategory = itemCategoryInput.value === "__new__";
+        const category = isNewCategory ? itemCategoryCustomInput.value.trim() : itemCategoryInput.value;
         if (!text) return;
         if (mirror && category === mirror.categoryName) {
           notify(`"${category}" ist als Kategoriename für die andere Liste reserviert.`);
           return;
         }
         itemTextInput.value = "";
+        if (isNewCategory) {
+          itemCategoryCustomInput.value = "";
+          itemCategoryCustomInput.hidden = true;
+          itemCategoryInput.value = "";
+        }
         if (category) localStorage.setItem(lastCategoryKey, category);
         await addItem(text, category);
       });

@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.20.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.21.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -77,9 +77,11 @@ function check(name, ok, detail) {
   const count = await page.textContent('#categories details[data-category="Obst und Gemüse"] .count');
   check("Kategorie-Zähler stimmt", count === "0/2", "gelesen: " + count);
 
-  // 5. datalist filled
-  const opts = await page.$$eval("#category-list option", (els) => els.map((e) => e.value));
-  check("Datalist enthält Kategorien", opts.includes("Obst und Gemüse"), opts.join(", "));
+  // 5. category <select> is populated with a native dropdown (works on iOS
+  // Safari, unlike a plain <input list="..."> datalist)
+  const opts = await page.$$eval("#item-category option", (els) => els.map((e) => e.value));
+  check("Kategorie-Auswahl enthält vorhandene Kategorien", opts.includes("Obst und Gemüse"), opts.join(", "));
+  check("Kategorie-Auswahl bietet eine Option für neue Kategorien", opts.includes("__new__"), opts.join(", "));
 
   // 6. toggling an item marks the row and persists after the debounce
   await page.click('#categories li[data-id="a1"] .switch');
@@ -169,11 +171,21 @@ function check(name, ok, detail) {
     occurrences === 1, JSON.stringify(afterSettle));
   await page.evaluate(() => { window.__store.__insertDelayMs = 0; });
 
-  // 14. a category name that collides with the mirror category is rejected
-  // client-side, so a real item can never be hidden behind mirrored ones.
+  // 14. picking an existing category from the dropdown fills the field
+  // without typing, and choosing "+ Neue Kategorie…" reveals a text input
+  // for a category name that collides with the mirror category — which is
+  // rejected client-side so a real item can never be hidden behind mirrored
+  // ones.
+  await page.selectOption("#item-category", "Obst und Gemüse");
+  check("Vorhandene Kategorie ist per Dropdown wählbar",
+    (await page.$eval("#item-category", (el) => el.value)) === "Obst und Gemüse");
+
   const beforeReserved = await page.evaluate(() => window.__store.shopping_items.length);
   await page.fill("#item-text", "Sollte nicht ankommen");
-  await page.fill("#item-category", "Reste vom Rewe");
+  await page.selectOption("#item-category", "__new__");
+  const customVisible = await page.getAttribute("#item-category-custom", "hidden");
+  check("'+ Neue Kategorie' blendet ein Textfeld ein", customVisible === null);
+  await page.fill("#item-category-custom", "Reste vom Rewe");
   await page.click('#add-item-form button[type="submit"]');
   await page.waitForTimeout(200);
   const afterReserved = await page.evaluate(() => window.__store.shopping_items.length);
@@ -182,7 +194,27 @@ function check(name, ok, detail) {
   const reservedToast = await page.textContent("#toast");
   check("Hinweis-Toast erklärt die Ablehnung", /reserviert/i.test(reservedToast || ""), "toast=" + reservedToast);
   await page.fill("#item-text", "");
-  await page.fill("#item-category", "");
+  await page.fill("#item-category-custom", "");
+  await page.selectOption("#item-category", "");
+
+  // Happy path: a genuinely new category goes through, appears on the item,
+  // the picker resets to the placeholder, and the new category later shows
+  // up as a selectable option once the list re-renders.
+  await page.fill("#item-text", "Kerzen");
+  await page.selectOption("#item-category", "__new__");
+  await page.fill("#item-category-custom", "Deko");
+  await page.click('#add-item-form button[type="submit"]');
+  await page.waitForTimeout(200);
+  const newItemCategory = await page.evaluate(() =>
+    window.__store.shopping_items.find((i) => i.text === "Kerzen")?.category
+  );
+  check("Neue Kategorie über '+ Neue Kategorie' wird übernommen", newItemCategory === "Deko", "category=" + newItemCategory);
+  const resetSelectValue = await page.$eval("#item-category", (el) => el.value);
+  const customHiddenAgain = await page.getAttribute("#item-category-custom", "hidden");
+  check("Auswahl setzt sich nach dem Anlegen zurück",
+    resetSelectValue === "" && customHiddenAgain !== null, `value=${resetSelectValue}`);
+  const decoNowSelectable = await page.$$eval("#item-category option", (els) => els.some((o) => o.value === "Deko"));
+  check("Die neue Kategorie erscheint danach selbst im Dropdown", decoNowSelectable);
 
   // 15. bulk check-all/uncheck-all still goes through the shared override
   // helpers after the refactor (setAllChecked used to clear its overrides
