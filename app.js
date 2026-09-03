@@ -277,6 +277,7 @@
 
       deleteBtn.addEventListener("click", () => {
         const current = li._item;
+        if (!confirm(`"${current.text}" wirklich löschen?`)) return;
         if (li._isMirror) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
         } else {
