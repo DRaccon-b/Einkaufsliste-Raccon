@@ -883,6 +883,9 @@
         await addItem(text, category);
       });
 
+      searchInput.addEventListener("focus", () => {
+        searchInput.select();
+      });
       searchInput.addEventListener("input", () => render());
 
       hideCheckedFilter.checked = localStorage.getItem(hideCheckedKey) === "1";

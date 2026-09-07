@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.23.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.23.1", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -115,6 +115,25 @@ function check(name, ok, detail) {
   await page.waitForTimeout(200);
   const visible = await page.$$eval("#categories li .item-text", (els) => els.map((e) => e.textContent));
   check("Suche filtert", visible.length === 1 && visible[0] === "Klopapier", JSON.stringify(visible));
+  await page.fill("#search-input", "");
+  await page.waitForTimeout(200);
+
+  // Focusing the search field with existing text must select it all too,
+  // same as the quantity field — so typing replaces instead of appending.
+  await page.fill("#search-input", "klopapier");
+  await page.$eval("#search-input", (el) => el.blur());
+  await page.focus("#search-input");
+  const searchSelection = await page.$eval("#search-input", (el) => ({
+    value: el.value,
+    selected: el.value.slice(el.selectionStart, el.selectionEnd),
+  }));
+  check("Suchfeld markiert seinen Inhalt beim Fokussieren komplett",
+    searchSelection.selected === searchSelection.value && searchSelection.value.length > 0,
+    JSON.stringify(searchSelection));
+  await page.keyboard.type("bananen");
+  const searchAfterType = await page.$eval("#search-input", (el) => el.value);
+  check("Eintippen ersetzt den markierten Suchtext statt ihn zu ergänzen",
+    searchAfterType === "bananen", "value=" + searchAfterType);
   await page.fill("#search-input", "");
   await page.waitForTimeout(200);
 
