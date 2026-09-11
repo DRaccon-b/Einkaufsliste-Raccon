@@ -30,7 +30,7 @@ function check(name, ok, detail) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
   const consoleErrors = [];
-  page.on("pageerror", (e) => consoleErrors.push(String(e)));
+  page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack || "")));
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
 
   await page.addInitScript(STUB);
@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.23.1", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.24.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -438,6 +438,91 @@ function check(name, ok, detail) {
   check("'Warm' stellt das ursprüngliche Rot der zweiten Liste wieder her",
     pageBAccentAfterWarm === "#b25a45", "accent=" + pageBAccentAfterWarm);
   await page.click("#home-btn");
+
+  // History view + undo/redo: add a fresh item, then walk it through
+  // checked -> undo -> redo -> deleted -> undo, checking both the activity
+  // log entries and that undo/redo actually reverse the real state.
+  await page.fill("#item-text", "Testartikel-Verlauf");
+  await page.click('#add-item-form button[type="submit"]');
+  await page.waitForTimeout(200);
+  const historyItemId = await page.$$eval(
+    "#categories li",
+    (lis, targetText) => {
+      const match = lis.find((li) => li.querySelector(".item-text")?.textContent === targetText);
+      return match ? match.dataset.id : null;
+    },
+    "Testartikel-Verlauf"
+  );
+  check("Neuer Testartikel für die Verlaufs-Tests wurde angelegt", !!historyItemId, "id=" + historyItemId);
+
+  await page.click("#history-btn");
+  await page.waitForTimeout(200);
+  const historyOverlayOpen = await page.getAttribute("#history-overlay", "hidden");
+  const historyBtnExpanded = await page.getAttribute("#history-btn", "aria-expanded");
+  check("Verlauf-Button öffnet die Übersicht", historyOverlayOpen === null && historyBtnExpanded === "true");
+
+  const firstEntryText = await page.$eval("#history-list .history-entry:first-child .history-entry-text", (el) => el.textContent);
+  check("Verlauf zeigt die zuletzt hinzugefügte Aktion oben",
+    firstEntryText.includes("Testartikel-Verlauf") && firstEntryText.includes("hinzugefügt"), "text=" + firstEntryText);
+
+  const undoEnabledAfterAdd = await page.getAttribute("#history-undo-btn", "disabled");
+  const redoDisabledInitially = await page.getAttribute("#history-redo-btn", "disabled");
+  check("Rückgängig ist nach einer Aktion aktiv, Wiederholen noch nicht",
+    undoEnabledAfterAdd === null && redoDisabledInitially !== null);
+
+  await page.click("#history-close-btn");
+  await page.waitForTimeout(100);
+  const overlayHiddenAfterClose = await page.getAttribute("#history-overlay", "hidden");
+  const historyBtnCollapsed = await page.getAttribute("#history-btn", "aria-expanded");
+  check("Schließen-Button schließt den Verlauf wieder", overlayHiddenAfterClose !== null && historyBtnCollapsed === "false");
+
+  // Check the item off, then look at the log for it.
+  await page.click(`#categories li[data-id="${historyItemId}"] .switch`);
+  await page.waitForTimeout(200);
+  await page.click("#history-btn");
+  await page.waitForTimeout(200);
+  const entryAfterCheck = await page.$eval("#history-list .history-entry:first-child .history-entry-text", (el) => el.textContent);
+  check("Abhaken erscheint als neuer Eintrag oben im Verlauf",
+    entryAfterCheck.includes("Testartikel-Verlauf") && entryAfterCheck.includes("abgehakt"), "text=" + entryAfterCheck);
+
+  await page.click("#history-undo-btn");
+  await page.waitForTimeout(300);
+  const checkedAfterUndo = await page.$eval(`#categories li[data-id="${historyItemId}"] .item-checkbox`, (el) => el.checked);
+  check("Rückgängig macht das Abhaken tatsächlich rückgängig", checkedAfterUndo === false);
+  const undoToast = await page.evaluate(() => document.getElementById("toast")?.textContent || "");
+  check("Toast bestätigt die Rückgängig-Aktion", /Rückgängig/i.test(undoToast), "toast=" + undoToast);
+
+  await page.click("#history-redo-btn");
+  await page.waitForTimeout(300);
+  const checkedAfterRedo = await page.$eval(`#categories li[data-id="${historyItemId}"] .item-checkbox`, (el) => el.checked);
+  check("Wiederholen stellt das Abhaken wieder her", checkedAfterRedo === true);
+
+  await page.click("#history-close-btn");
+  await page.waitForTimeout(100);
+
+  // Delete the item, then undo the deletion and confirm it's really back —
+  // not just visually, but as a real row a partner's device would also see.
+  await page.click(`#categories li[data-id="${historyItemId}"] .delete-btn`); // window.confirm stubbed to true
+  await page.waitForTimeout(200);
+  const goneAfterDelete = await page.evaluate(
+    (id) => !window.__store.shopping_items.some((i) => i.id === id),
+    historyItemId
+  );
+  check("Löschen entfernt den Testartikel wirklich", goneAfterDelete);
+
+  await page.click("#history-btn");
+  await page.waitForTimeout(200);
+  await page.click("#history-undo-btn");
+  await page.waitForTimeout(300);
+  const restoredInStore = await page.evaluate(
+    (id) => window.__store.shopping_items.some((i) => i.id === id),
+    historyItemId
+  );
+  check("Rückgängig stellt den gelöschten Artikel im Store wieder her", restoredInStore);
+  await page.click("#history-close-btn");
+  await page.waitForTimeout(100);
+  const restoredInDom = await page.$(`#categories li[data-id="${historyItemId}"]`);
+  check("Wiederhergestellter Artikel erscheint auch wieder in der Liste", restoredInDom !== null);
 
   // 12. no runtime errors, no alerts (blocked CDN requests are expected)
   const appLog = await page.evaluate(() => window.__log);

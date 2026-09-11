@@ -11,7 +11,7 @@
     <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png" />
     <link rel="icon" href="icons/favicon-16.png" sizes="16x16" type="image/png" />
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="style.css?v=1.23.1" />
+    <link rel="stylesheet" href="style.css?v=1.24.0" />
   </head>
   <body>
     <div class="pager" id="pager">
@@ -19,7 +19,7 @@
         <div class="page-inner">
           <div class="title-row">
             <h1>🦝🐭 Einkaufsliste</h1>
-            <div class="version-tag">v1.23.1</div>
+            <div class="version-tag">v1.24.0</div>
           </div>
 
           <form class="add-item" id="add-item-form" hidden>
@@ -79,6 +79,16 @@
             >
               ⚙️
             </button>
+            <button
+              type="button"
+              id="history-btn"
+              class="icon-btn"
+              title="Verlauf"
+              aria-label="Verlauf"
+              aria-expanded="false"
+            >
+              🕘
+            </button>
           </div>
 
           <div class="settings-panel" id="settings-panel" hidden>
@@ -105,6 +115,23 @@
           </div>
         </div>
       </section>
+
+      <div class="history-overlay" id="history-overlay" hidden>
+        <div class="history-panel">
+          <div class="history-header">
+            <div class="history-title">Verlauf</div>
+            <button type="button" id="history-close-btn" class="icon-btn" title="Schließen" aria-label="Schließen">✕</button>
+          </div>
+          <div class="history-undo-row">
+            <button type="button" id="history-undo-btn" class="secondary" disabled>↩️ Rückgängig</button>
+            <button type="button" id="history-redo-btn" class="secondary" disabled>↪️ Wiederholen</button>
+          </div>
+          <div class="history-hint">Rückgängig/Wiederholen wirkt nur auf deine eigenen letzten Aktionen auf diesem Gerät.</div>
+          <div id="history-list" class="history-list"></div>
+          <div class="empty" id="history-empty" hidden>Noch keine Aktivität.</div>
+          <div class="empty" id="history-loading">Lade…</div>
+        </div>
+      </div>
 
       <section class="page page-b" data-suffix="-b">
         <div class="page-inner">
@@ -152,9 +179,9 @@
       </section>
     </div>
 
-    <script src="config.js?v=1.23.1"></script>
+    <script src="config.js?v=1.24.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-    <script src="app.js?v=1.23.1"></script>
+    <script src="app.js?v=1.24.0"></script>
   </body>
 </html>

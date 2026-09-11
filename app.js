@@ -168,6 +168,107 @@
     let renderedCategoryOptions = null;
     const mirror = options && options.mirror;
 
+    // The history view + undo/redo only exist on the page that has this
+    // markup (currently page A) — skip all of it entirely for controllers
+    // without it, rather than writing to activity_log with nowhere to see it.
+    const historyBtn = el("history-btn" + suffix);
+    const hasHistoryUI = !!historyBtn;
+    let undoStack = [];
+    let redoStack = [];
+
+    async function logActivity(action, item) {
+      if (!hasHistoryUI) return;
+      try {
+        await supabase.from("activity_log").insert({
+          list_id: listId,
+          item_id: item.id && !String(item.id).startsWith("temp-") ? item.id : null,
+          item_text: item.text,
+          category: item.category || null,
+          action,
+          item_snapshot:
+            action === "deleted"
+              ? {
+                  text: item.text,
+                  category: item.category,
+                  quantity: item.quantity ?? null,
+                  unit: item.unit ?? null,
+                  checked: item.checked,
+                  important: item.important,
+                  position: item.position ?? null,
+                  category_order: item.category_order ?? null,
+                }
+              : null,
+        });
+      } catch {
+        // Best-effort audit trail only — never block the real action on this.
+      }
+    }
+
+    function pushUndo(entry) {
+      if (!hasHistoryUI) return;
+      undoStack.push(entry);
+      redoStack = [];
+      updateUndoRedoButtons();
+    }
+
+    // Overwritten by setupHistory() once the panel exists; harmless no-op
+    // for controllers without the history UI (hasHistoryUI is false there).
+    function updateUndoRedoButtons() {}
+
+    function applyCheckedChange(itemId, checked) {
+      let item = allItems.find((i) => i.id === itemId);
+      if (item) {
+        item.checked = checked;
+      } else {
+        item = mirrorItems.find((i) => i.id === itemId);
+        if (item) {
+          item.checked = checked;
+          if (checked) mirrorItems = mirrorItems.filter((i) => i.id !== itemId);
+        }
+      }
+      if (!item) return;
+      writeFieldsDebounced(itemId, { checked }, "Konnte Status nicht ändern: ");
+      render();
+    }
+
+    function performDelete(itemId) {
+      allItems = allItems.filter((i) => i.id !== itemId);
+      render();
+      deleteItem(itemId);
+    }
+
+    async function restoreDeletedItem(snapshot) {
+      // A mirrored item's true home is the other list — restoring it there
+      // (not into this controller's own allItems) is what its own realtime
+      // subscription will pick up and add back to that list's own mirror.
+      const fields = {
+        id: snapshot.id,
+        list_id: snapshot.list_id || listId,
+        text: snapshot.text,
+        category: snapshot.category,
+        category_order: snapshot.category_order ?? null,
+        position: snapshot.position ?? null,
+        quantity: snapshot.quantity ?? null,
+        unit: snapshot.unit ?? null,
+        checked: snapshot.checked,
+        important: snapshot.important,
+      };
+      const isOwn = fields.list_id === listId;
+      if (isOwn) {
+        allItems.push({ ...fields, _pending: true });
+        allItems.sort(compareItems);
+        render();
+      }
+      const { error } = await supabase.from("shopping_items").insert(fields);
+      if (error) {
+        notify("Konnte Aktion nicht rückgängig machen: " + error.message);
+        if (isOwn) {
+          allItems = allItems.filter((i) => i.id !== fields.id);
+          render();
+        }
+      }
+    }
+
     function getCollapsedSet() {
       try {
         return new Set(JSON.parse(localStorage.getItem(collapsedKey) || "[]"));
@@ -230,15 +331,23 @@
 
       checkbox.addEventListener("change", () => {
         const current = li._item;
-        current.checked = checkbox.checked;
-        if (li._isMirror && checkbox.checked) {
+        const wasChecked = !checkbox.checked;
+        const nowChecked = checkbox.checked;
+        current.checked = nowChecked;
+        if (li._isMirror && nowChecked) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
         }
-        toggleItem(current.id, checkbox.checked);
+        toggleItem(current.id, nowChecked);
         // Re-render synchronously so the "nur unerledigte" filter and the
         // category count reflect the change immediately, not just after the
         // debounced write echoes back over realtime.
         render();
+        logActivity(nowChecked ? "checked" : "unchecked", current);
+        pushUndo({
+          label: `"${current.text}" ${nowChecked ? "abgehakt" : "zurückgesetzt"}`,
+          undo: () => applyCheckedChange(current.id, wasChecked),
+          redo: () => applyCheckedChange(current.id, nowChecked),
+        });
       });
 
       span.addEventListener("keydown", (e) => {
@@ -278,6 +387,7 @@
       deleteBtn.addEventListener("click", () => {
         const current = li._item;
         if (!confirm(`"${current.text}" wirklich löschen?`)) return;
+        const snapshot = { ...current };
         if (li._isMirror) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);
         } else {
@@ -285,6 +395,12 @@
         }
         deleteItem(current.id);
         render();
+        logActivity("deleted", current);
+        pushUndo({
+          label: `"${current.text}" gelöscht`,
+          undo: () => restoreDeletedItem(snapshot),
+          redo: () => performDelete(snapshot.id),
+        });
       });
 
       updateItemRow(li, item, isMirrorCategory);
@@ -690,15 +806,26 @@
         render();
         return;
       }
-      if (index === -1) return; // realtime echo already reconciled it
 
-      if (allItems.some((i) => i.id === data.id)) {
-        allItems.splice(index, 1); // realtime echo won the race; drop our temp copy
-      } else {
-        allItems[index] = data;
+      // If the realtime echo already reconciled the temp id (index === -1),
+      // there's nothing left to patch into allItems here — but the add still
+      // happened and must still be logged/undoable either way.
+      if (index !== -1) {
+        if (allItems.some((i) => i.id === data.id)) {
+          allItems.splice(index, 1); // realtime echo won the race; drop our temp copy
+        } else {
+          allItems[index] = data;
+        }
+        allItems.sort(compareItems);
+        render();
       }
-      allItems.sort(compareItems);
-      render();
+
+      logActivity("added", data);
+      pushUndo({
+        label: `"${data.text}" hinzugefügt`,
+        undo: () => performDelete(data.id),
+        redo: () => restoreDeletedItem(data),
+      });
     }
 
     // Clears just the given fields from an item's override once they're safely
@@ -914,8 +1041,119 @@
         }
       });
 
+      setupHistory();
+
       await Promise.all([loadItems(), loadMirrorItems()]);
       subscribeToChanges();
+    }
+
+    function setupHistory() {
+      if (!hasHistoryUI) return;
+      const overlay = el("history-overlay" + suffix);
+      const closeBtn = el("history-close-btn" + suffix);
+      const undoBtn = el("history-undo-btn" + suffix);
+      const redoBtn = el("history-redo-btn" + suffix);
+      const listEl = el("history-list" + suffix);
+      const emptyEl = el("history-empty" + suffix);
+      const loadingEl = el("history-loading" + suffix);
+
+      const actionIcons = { added: "➕", checked: "✅", unchecked: "◻️", deleted: "🗑️" };
+      const actionLabels = { added: "hinzugefügt", checked: "abgehakt", unchecked: "zurückgesetzt", deleted: "gelöscht" };
+
+      function formatRelativeTime(iso) {
+        const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+        if (minutes < 1) return "gerade eben";
+        if (minutes < 60) return `vor ${minutes} Min.`;
+        const hours = Math.round(minutes / 60);
+        if (hours < 24) return `vor ${hours} Std.`;
+        const days = Math.round(hours / 24);
+        return `vor ${days} Tag${days === 1 ? "" : "en"}`;
+      }
+
+      updateUndoRedoButtons = () => {
+        undoBtn.disabled = undoStack.length === 0;
+        redoBtn.disabled = redoStack.length === 0;
+      };
+
+      async function loadHistory() {
+        loadingEl.hidden = false;
+        emptyEl.hidden = true;
+        listEl.innerHTML = "";
+        const { data, error } = await supabase
+          .from("activity_log")
+          .select("*")
+          .eq("list_id", listId)
+          .order("created_at", { ascending: false })
+          .limit(50);
+        loadingEl.hidden = true;
+        if (error) {
+          notify("Konnte Verlauf nicht laden: " + error.message);
+          return;
+        }
+        emptyEl.hidden = data.length > 0;
+        for (const entry of data) {
+          const row = document.createElement("div");
+          row.className = "history-entry";
+
+          const icon = document.createElement("div");
+          icon.className = "history-entry-icon";
+          icon.textContent = actionIcons[entry.action] || "•";
+
+          const body = document.createElement("div");
+          body.className = "history-entry-body";
+          const textEl = document.createElement("div");
+          textEl.className = "history-entry-text";
+          textEl.textContent = `${entry.item_text} ${actionLabels[entry.action] || entry.action}`;
+          const metaEl = document.createElement("div");
+          metaEl.className = "history-entry-meta";
+          metaEl.textContent = formatRelativeTime(entry.created_at) + (entry.category ? ` · ${entry.category}` : "");
+          body.append(textEl, metaEl);
+
+          row.append(icon, body);
+          listEl.appendChild(row);
+        }
+      }
+
+      function openHistory() {
+        overlay.hidden = false;
+        historyBtn.setAttribute("aria-expanded", "true");
+        loadHistory();
+      }
+
+      function closeHistory() {
+        overlay.hidden = true;
+        historyBtn.setAttribute("aria-expanded", "false");
+      }
+
+      historyBtn.addEventListener("click", openHistory);
+      closeBtn.addEventListener("click", closeHistory);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeHistory();
+      });
+
+      undoBtn.addEventListener("click", async () => {
+        const entry = undoStack.pop();
+        if (!entry) return;
+        updateUndoRedoButtons();
+        await entry.undo();
+        redoStack.push(entry);
+        updateUndoRedoButtons();
+        notify(`Rückgängig: ${entry.label}`);
+        if (!overlay.hidden) loadHistory();
+      });
+
+      redoBtn.addEventListener("click", async () => {
+        const entry = redoStack.pop();
+        if (!entry) return;
+        updateUndoRedoButtons();
+        await entry.redo();
+        undoStack.push(entry);
+        updateUndoRedoButtons();
+        notify(`Wiederholt: ${entry.label}`);
+        if (!overlay.hidden) loadHistory();
+      });
+
+      updateUndoRedoButtons();
     }
 
     init();

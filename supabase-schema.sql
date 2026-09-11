@@ -52,3 +52,22 @@ begin
 exception
   when duplicate_object then null;
 end $$;
+
+-- Verlauf: protokolliert Abhaken/Hinzufügen/Löschen für die Verlaufsansicht.
+create table if not exists activity_log (
+  id uuid primary key default gen_random_uuid(),
+  list_id uuid not null references shopping_lists(id) on delete cascade,
+  item_id uuid,
+  item_text text not null,
+  category text,
+  action text not null check (action in ('added', 'checked', 'unchecked', 'deleted')),
+  item_snapshot jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_log_list_id_created_at_idx
+  on activity_log (list_id, created_at desc);
+
+alter table activity_log enable row level security;
+drop policy if exists "public access" on activity_log;
+create policy "public access" on activity_log for all using (true) with check (true);
