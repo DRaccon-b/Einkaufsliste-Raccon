@@ -333,6 +333,15 @@
         const current = li._item;
         const wasChecked = !checkbox.checked;
         const nowChecked = checkbox.checked;
+
+        // Confirm before actually checking something off, to catch the
+        // "aus Versehen zwei Sachen abgehakt" case — declining reverts the
+        // switch without touching anything else.
+        if (nowChecked && !confirm(`"${current.text}" wirklich im Einkaufswagen?`)) {
+          checkbox.checked = false;
+          return;
+        }
+
         current.checked = nowChecked;
         if (li._isMirror && nowChecked) {
           mirrorItems = mirrorItems.filter((i) => i.id !== current.id);

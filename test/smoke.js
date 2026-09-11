@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.25.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.26.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -167,6 +167,43 @@ function check(name, ok, detail) {
   await page.waitForTimeout(500);
   const a3gone = await page.evaluate(() => !window.__store.shopping_items.some((i) => i.id === "a3"));
   check("Löschen entfernt den Artikel", a3gone);
+
+  // Checking an item off now asks for confirmation first (catches
+  // accidentally checking the wrong thing); declining reverts the switch
+  // and leaves the item untouched, confirming lets it through as normal.
+  await page.evaluate(async () => {
+    await window.supabase.createClient().from("shopping_items").insert({
+      id: "confirm-check-1", list_id: "LIST-A", category: "Haushalt", category_order: 5,
+      position: 600, text: "Bestätigungs-Test", checked: false, important: false, quantity: null, unit: null,
+    });
+  });
+  await page.waitForTimeout(150);
+  await page.evaluate(() => { window.confirm = () => false; });
+  await page.click('#categories li[data-id="confirm-check-1"] .switch');
+  await page.waitForTimeout(150);
+  const uncheckedAfterDecline = await page.$eval('#categories li[data-id="confirm-check-1"] .item-checkbox', (el) => el.checked);
+  const storeUncheckedAfterDecline = await page.evaluate(
+    () => window.__store.shopping_items.find((i) => i.id === "confirm-check-1").checked
+  );
+  check("Ablehnen der Abhak-Bestätigung lässt den Regler unverändert",
+    uncheckedAfterDecline === false && storeUncheckedAfterDecline === false);
+
+  await page.evaluate(() => { window.confirm = () => true; });
+  await page.click('#categories li[data-id="confirm-check-1"] .switch');
+  await page.waitForTimeout(300);
+  const checkedAfterConfirm = await page.$eval('#categories li[data-id="confirm-check-1"] .item-checkbox', (el) => el.checked);
+  const storeCheckedAfterConfirm = await page.evaluate(
+    () => window.__store.shopping_items.find((i) => i.id === "confirm-check-1").checked
+  );
+  check("Bestätigen hakt den Artikel wirklich ab", checkedAfterConfirm === true && storeCheckedAfterConfirm === true);
+
+  // Unchecking an already-checked item must NOT ask for confirmation.
+  await page.evaluate(() => { window.confirm = () => false; });
+  await page.click('#categories li[data-id="confirm-check-1"] .switch');
+  await page.waitForTimeout(300);
+  const uncheckedWithoutPrompt = await page.$eval('#categories li[data-id="confirm-check-1"] .item-checkbox', (el) => el.checked);
+  check("Zurücksetzen (Abhaken rückgängig) fragt nicht nach", uncheckedWithoutPrompt === false);
+  await page.evaluate(() => { window.confirm = () => true; });
 
   // Focusing a quantity field with an existing value must select it all, so
   // typing immediately replaces it instead of appending to/behind it.
