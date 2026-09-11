@@ -59,7 +59,7 @@ function check(name, ok, detail) {
 
   // 1. version tag is derived from the app.js query param
   const version = await page.textContent(".version-tag");
-  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.24.0", "gelesen: " + version);
+  check("Versions-Tag wird aus app.js?v= gesetzt", version === "v1.25.0", "gelesen: " + version);
 
   // 2. list A rendered its own categories
   const catsA = await page.$$eval("#categories details.category", (els) => els.map((e) => e.dataset.category));
@@ -523,6 +523,27 @@ function check(name, ok, detail) {
   await page.waitForTimeout(100);
   const restoredInDom = await page.$(`#categories li[data-id="${historyItemId}"]`);
   check("Wiederhergestellter Artikel erscheint auch wieder in der Liste", restoredInDom !== null);
+
+  // The second list ("Rewe zweite Wahl") gets its own independent history +
+  // undo/redo too, not just the main list.
+  await page.click('#categories-b li[data-id="b1"] .switch');
+  await page.waitForTimeout(200);
+  await page.click("#history-btn-b");
+  await page.waitForTimeout(200);
+  const bOverlayOpen = await page.getAttribute("#history-overlay-b", "hidden");
+  check("Verlauf-Button auf Seite B öffnet die eigene Übersicht", bOverlayOpen === null);
+
+  const bEntryText = await page.$eval("#history-list-b .history-entry:first-child .history-entry-text", (el) => el.textContent);
+  check("Verlauf von Seite B protokolliert Aktionen auf Seite B",
+    bEntryText.includes("Nachos") && bEntryText.includes("abgehakt"), "text=" + bEntryText);
+
+  await page.click("#history-undo-btn-b");
+  await page.waitForTimeout(300);
+  const bCheckedAfterUndo = await page.$eval('#categories-b li[data-id="b1"] .item-checkbox', (el) => el.checked);
+  check("Rückgängig auf Seite B wirkt unabhängig von Liste A", bCheckedAfterUndo === false);
+
+  await page.click("#history-close-btn-b");
+  await page.waitForTimeout(100);
 
   // 12. no runtime errors, no alerts (blocked CDN requests are expected)
   const appLog = await page.evaluate(() => window.__log);
